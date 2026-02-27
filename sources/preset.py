@@ -19,7 +19,7 @@ def fetch(config: dict) -> list[dict]:
         return []
 
     try:
-        token = _login(workspace_url, api_key, api_secret)
+        token = _login(api_key, api_secret)
     except Exception as e:
         logger.error("Preset auth failed: %s", e)
         return []
@@ -52,17 +52,12 @@ def fetch(config: dict) -> list[dict]:
     return assets
 
 
-def _login(workspace_url: str, api_key: str, api_secret: str) -> str:
-    url = f"{workspace_url}/api/v1/security/login"
-    payload = {
-        "username": api_key,
-        "password": api_secret,
-        "provider": "db",
-        "refresh": True,
-    }
-    resp = requests.post(url, json=payload, timeout=30)
+def _login(api_key: str, api_secret: str) -> str:
+    # Preset API keys authenticate via the Preset Manager API, not the workspace login endpoint
+    url = "https://api.app.preset.io/v1/auth/"
+    resp = requests.post(url, json={"name": api_key, "secret": api_secret}, timeout=30)
     resp.raise_for_status()
-    return resp.json()["access_token"]
+    return resp.json()["payload"]["token"]
 
 
 def _paginate(url: str, headers: dict) -> list[dict]:

@@ -1,6 +1,7 @@
 """Databricks Lakeview (AI/BI) Dashboard API client."""
 
 import logging
+import time
 from datetime import datetime, timezone
 
 import requests
@@ -55,6 +56,9 @@ def _list_dashboards(host: str, headers: dict) -> list[dict]:
 
     while True:
         resp = requests.get(url, headers=headers, params=params, timeout=30)
+        if resp.status_code == 429:
+            time.sleep(int(resp.headers.get("Retry-After", 10)))
+            continue
         resp.raise_for_status()
         data = resp.json()
 

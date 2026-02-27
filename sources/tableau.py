@@ -64,7 +64,11 @@ def _signin(server_url: str, site_id: str, token_name: str, token_value: str) ->
         }
     }
     resp = requests.post(url, json=payload, timeout=30)
+    if not resp.ok:
+        logger.error("Tableau signin HTTP %s: %s", resp.status_code, resp.text[:500])
     resp.raise_for_status()
+    if not resp.text.strip():
+        raise ValueError(f"Tableau signin returned empty body (HTTP {resp.status_code})")
     data = resp.json()
     token = data["credentials"]["token"]
     site_content_url = data["credentials"]["site"]["contentUrl"]
