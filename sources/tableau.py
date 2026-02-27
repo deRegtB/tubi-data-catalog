@@ -27,7 +27,7 @@ def fetch(config: dict) -> list[dict]:
         return []
 
     headers = {"x-tableau-auth": token, "Accept": "application/json"}
-    base = f"{server_url}/api/3.x/sites/{site_id}"
+    base = f"{server_url}/api/3.21/sites/{site_id}"
 
     assets = []
 
@@ -55,7 +55,7 @@ def fetch(config: dict) -> list[dict]:
 
 
 def _signin(server_url: str, site_id: str, token_name: str, token_value: str) -> tuple[str, str]:
-    url = f"{server_url}/api/3.x/auth/signin"
+    url = f"{server_url}/api/3.21/auth/signin"
     payload = {
         "credentials": {
             "personalAccessTokenName": token_name,
@@ -72,7 +72,7 @@ def _signin(server_url: str, site_id: str, token_name: str, token_value: str) ->
 
 
 def _signout(server_url: str, token: str) -> None:
-    url = f"{server_url}/api/3.x/auth/signout"
+    url = f"{server_url}/api/3.21/auth/signout"
     requests.post(url, headers={"x-tableau-auth": token}, timeout=10)
 
 
