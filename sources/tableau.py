@@ -63,8 +63,7 @@ def _signin(server_url: str, site_id: str, token_name: str, token_value: str) ->
             "site": {"contentUrl": site_id},
         }
     }
-    resp = requests.post(url, json=payload, timeout=30)
-    logger.info("Tableau signin HTTP %s, body preview: %r", resp.status_code, resp.text[:300])
+    resp = requests.post(url, json=payload, headers={"Accept": "application/json"}, timeout=30)
     resp.raise_for_status()
     data = resp.json()
     token = data["credentials"]["token"]
