@@ -241,11 +241,8 @@
     }
     .glossary-card.hidden { display: none; }
     .glossary-term-name { font-weight: 600; font-size: 0.9rem; }
-    .glossary-sql-toggle { font-size: 0.75rem; color: #6b7280; cursor: pointer; margin-top: 0.3rem; }
-    .glossary-sql-toggle summary { display: inline; list-style: none; }
-    .glossary-sql-toggle summary::-webkit-details-marker { display: none; }
-    .glossary-sql-toggle summary::before { content: '▶ Show SQL'; }
-    .glossary-sql-toggle[open] summary::before { content: '▼ Hide SQL'; }
+    .glossary-sql-toggle { margin-top: 0.3rem; }
+    .glossary-sql-toggle summary { font-size: 0.75rem; color: #6b7280; cursor: pointer; user-select: none; }
     .glossary-sql-toggle pre { margin: 0.4rem 0 0; padding: 0.5rem 0.75rem; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 4px; font-size: 0.75rem; overflow-x: auto; white-space: pre; }
     .glossary-definition { font-size: 0.82rem; color: #4b5563; margin-top: 0.15rem; }
     .glossary-dashboards { font-size: 0.75rem; color: #6b7280; margin-top: 0.25rem; }
@@ -522,7 +519,7 @@
           {% for tag in term.tags[1:] %}<span class="badge-category">{{ tag }}</span>{% endfor %}
         </div>
         <div class="glossary-definition">{{ term.definition }}</div>
-        {% if term.formula %}<details class="glossary-sql-toggle"><summary></summary><pre>{{ term.formula }}</pre></details>{% endif %}
+        {% if term.formula %}<details class="glossary-sql-toggle"><summary>Show SQL</summary><pre>{{ term.formula }}</pre></details>{% endif %}
         {% if term.dashboards %}
         <div class="glossary-dashboards">Dashboards: {% for name in term.dashboards %}<a onclick="jumpToDashboard('{{ name | lower }}')">{{ name }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</div>
         {% endif %}
