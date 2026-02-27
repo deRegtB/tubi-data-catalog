@@ -240,14 +240,14 @@
       margin-bottom: 0.5rem;
     }
     .glossary-card.hidden { display: none; }
-    .glossary-term-name { font-weight: 600; font-size: 0.9rem; color: inherit; text-decoration: none; }
-    .glossary-term-name:hover { text-decoration: underline; color: #2563eb; }
+    .glossary-term-name { font-weight: 600; font-size: 0.9rem; }
+    .glossary-sql-toggle { font-size: 0.75rem; color: #6b7280; cursor: pointer; margin-top: 0.3rem; }
+    .glossary-sql-toggle summary { display: inline; list-style: none; }
+    .glossary-sql-toggle summary::-webkit-details-marker { display: none; }
+    .glossary-sql-toggle summary::before { content: '▶ Show SQL'; }
+    .glossary-sql-toggle[open] summary::before { content: '▼ Hide SQL'; }
+    .glossary-sql-toggle pre { margin: 0.4rem 0 0; padding: 0.5rem 0.75rem; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 4px; font-size: 0.75rem; overflow-x: auto; white-space: pre; }
     .glossary-definition { font-size: 0.82rem; color: #4b5563; margin-top: 0.15rem; }
-    .glossary-formula {
-      font-size: 0.78rem; color: #6b7280; font-family: monospace;
-      background: #f9fafb; padding: 0.15rem 0.4rem; border-radius: 4px;
-      margin-top: 0.25rem; display: inline-block;
-    }
     .glossary-dashboards { font-size: 0.75rem; color: #6b7280; margin-top: 0.25rem; }
     .glossary-dashboards a { color: #2563eb; cursor: pointer; text-decoration: none; }
     .glossary-dashboards a:hover { text-decoration: underline; }
@@ -501,7 +501,7 @@
       {% for term in glossary_only %}
       <div class="glossary-card" data-term="{{ term.term | lower }}" data-category="{{ term.category | lower }}" data-type="glossary">
         <div>
-          {% if term.source_url %}<a href="{{ term.source_url }}" target="_blank" rel="noopener" class="glossary-term-name">{{ term.term }} ↗</a>{% else %}<span class="glossary-term-name">{{ term.term }}</span>{% endif %}
+          <span class="glossary-term-name">{{ term.term }}</span>
           <span class="badge-category badge-glossary">{{ term.category }}</span>
         </div>
         <div class="glossary-definition">{{ term.definition }}</div>
@@ -517,12 +517,12 @@
       {% for term in metrics_only %}
       <div class="glossary-card" data-term="{{ term.term | lower }}" data-category="{{ term.category | lower }}" data-type="metric">
         <div>
-          {% if term.source_url %}<a href="{{ term.source_url }}" target="_blank" rel="noopener" class="glossary-term-name">{{ term.term }} ↗</a>{% else %}<span class="glossary-term-name">{{ term.term }}</span>{% endif %}
+          <span class="glossary-term-name">{{ term.term }}</span>
           <span class="badge-category badge-metric">{{ term.category }}</span>
           {% for tag in term.tags[1:] %}<span class="badge-category">{{ tag }}</span>{% endfor %}
         </div>
         <div class="glossary-definition">{{ term.definition }}</div>
-        {% if term.formula %}<div class="glossary-formula">{{ term.formula }}</div>{% endif %}
+        {% if term.formula %}<details class="glossary-sql-toggle"><summary></summary><pre>{{ term.formula }}</pre></details>{% endif %}
         {% if term.dashboards %}
         <div class="glossary-dashboards">Dashboards: {% for name in term.dashboards %}<a onclick="jumpToDashboard('{{ name | lower }}')">{{ name }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</div>
         {% endif %}
