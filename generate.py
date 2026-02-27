@@ -3,13 +3,14 @@
 import os
 import sys
 import logging
+import yaml
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader
 
-from sources import tableau, preset, databricks
+from sources import tableau, preset, databricks, glossary
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -32,8 +33,48 @@ def load_config() -> dict:
         "TABLEAU_SERVER_URL", "TABLEAU_SITE_ID", "TABLEAU_TOKEN_NAME", "TABLEAU_TOKEN_VALUE",
         "PRESET_API_KEY", "PRESET_API_SECRET", "PRESET_WORKSPACE_URL",
         "DATABRICKS_HOST", "DATABRICKS_TOKEN",
+        "GLOSSARY_GITHUB_TOKEN",
     ]
     return {k: os.environ.get(k, "") for k in keys}
+
+
+def load_metadata() -> dict:
+    path = Path(__file__).parent / "metadata.yml"
+    if not path.exists():
+        return {"featured": [], "name_to_domains": {}, "name_to_tags": {}}
+    with path.open() as f:
+        raw = yaml.safe_load(f) or {}
+    featured = [n.lower() for n in raw.get("featured", [])]
+    name_to_domains = {}
+    for domain, names in (raw.get("domains") or {}).items():
+        for name in (names or []):
+            name_to_domains.setdefault(name.lower(), []).append(domain)
+    name_to_tags = {}
+    for tag, names in (raw.get("tags") or {}).items():
+        for name in (names or []):
+            name_to_tags.setdefault(name.lower(), []).append(tag)
+    return {"featured": featured, "name_to_domains": name_to_domains, "name_to_tags": name_to_tags}
+
+
+def enrich_assets(assets: list[dict], metadata: dict) -> None:
+    featured_names = metadata["featured"]
+    name_to_domains = metadata["name_to_domains"]
+    name_to_tags = metadata["name_to_tags"]
+    for asset in assets:
+        name_lower = asset["name"].lower()
+        asset["featured"] = any(f in name_lower for f in featured_names)
+        asset["domains"] = name_to_domains.get(name_lower, [])
+        asset["tags"] = name_to_tags.get(name_lower, [])
+        asset["related_terms"] = []
+
+
+def link_glossary(terms: list[dict], assets: list[dict]) -> None:
+    for term in terms:
+        term_lower = term["term"].lower()
+        for asset in assets:
+            if term_lower in asset["name"].lower():
+                term["dashboards"].append(asset["name"])
+                asset["related_terms"].append(term["term"])
 
 
 def main() -> None:
@@ -43,19 +84,24 @@ def main() -> None:
         "tableau": lambda: tableau.fetch(config),
         "preset": lambda: preset.fetch(config),
         "databricks": lambda: databricks.fetch(config),
+        "glossary": lambda: glossary.fetch(config),
     }
 
     all_assets: list[dict] = []
+    glossary_terms: list[dict] = []
     errors: list[str] = []
 
-    with ThreadPoolExecutor(max_workers=3) as executor:
+    with ThreadPoolExecutor(max_workers=4) as executor:
         futures = {executor.submit(fn): name for name, fn in fetchers.items()}
         for future in as_completed(futures):
             name = futures[future]
             try:
-                assets = future.result()
-                logger.info("%s: fetched %d assets", name, len(assets))
-                all_assets.extend(assets)
+                results = future.result()
+                logger.info("%s: fetched %d items", name, len(results))
+                if name == "glossary":
+                    glossary_terms.extend(results)
+                else:
+                    all_assets.extend(results)
             except Exception as e:
                 logger.error("%s: fetch raised exception: %s", name, e)
                 errors.append(f"{name}: {e}")
@@ -64,9 +110,23 @@ def main() -> None:
     for asset in all_assets:
         asset["status"] = compute_status(asset)
 
-    # Sort: active first, then stale, then unknown; within each group sort by name
+    # Load metadata and enrich assets
+    metadata = load_metadata()
+    enrich_assets(all_assets, metadata)
+
+    # Link glossary terms to assets
+    link_glossary(glossary_terms, all_assets)
+
+    # Collect all domains across assets
+    all_domains = sorted({d for asset in all_assets for d in asset["domains"]})
+
+    # Sort: active first, then stale, then unknown; within each group featured first, then by name
     status_order = {"active": 0, "stale": 1, "unknown": 2}
-    all_assets.sort(key=lambda a: (status_order.get(a["status"], 2), a["name"].lower()))
+    all_assets.sort(key=lambda a: (
+        status_order.get(a["status"], 2),
+        0 if a["featured"] else 1,
+        a["name"].lower(),
+    ))
 
     generated_at = datetime.now(timezone.utc)
 
@@ -74,6 +134,8 @@ def main() -> None:
     template = env.get_template("template.html")
     html = template.render(
         assets=all_assets,
+        glossary_terms=glossary_terms,
+        all_domains=all_domains,
         generated_at=generated_at,
         errors=errors,
         counts={
@@ -86,7 +148,7 @@ def main() -> None:
 
     output_path = Path(__file__).parent / "catalog.html"
     output_path.write_text(html, encoding="utf-8")
-    print(f"Generated {len(all_assets)} assets → {output_path}")
+    print(f"Generated {len(all_assets)} assets, {len(glossary_terms)} glossary terms → {output_path}")
     if errors:
         print(f"Errors: {', '.join(errors)}", file=sys.stderr)
 

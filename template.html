@@ -61,6 +61,91 @@
       padding: 0.5rem 1.25rem;
       border-radius: 20px;
     }
+
+    /* Featured section */
+    .featured-section {
+      border-left: 4px solid #f0c040;
+      background: #fffbea;
+      border-radius: 0 8px 8px 0;
+      padding: 0.75rem 1rem 0.25rem;
+      margin-bottom: 1rem;
+    }
+    .featured-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #b8860b;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.5rem;
+    }
+    .featured-section .asset-card {
+      border-left: none;
+    }
+
+    /* Tag pills */
+    .tag-pill {
+      display: inline-block;
+      background: #e9ecef;
+      color: #495057;
+      border-radius: 12px;
+      padding: 0.1rem 0.55rem;
+      font-size: 0.72rem;
+      cursor: pointer;
+      margin-right: 0.25rem;
+      margin-top: 0.25rem;
+      border: 1px solid transparent;
+    }
+    .tag-pill:hover { background: #dee2e6; }
+    .tag-pill.active { background: #0d6efd; color: #fff; border-color: #0d6efd; }
+
+    /* Related terms */
+    .related-terms { font-size: 0.78rem; color: #6c757d; margin-top: 0.25rem; }
+    .related-terms a { color: #0d6efd; text-decoration: none; }
+    .related-terms a:hover { text-decoration: underline; }
+
+    /* Glossary section */
+    #glossary-section { margin-top: 2.5rem; }
+    #glossary-section h2 { font-size: 1.3rem; font-weight: 700; margin-bottom: 1rem; }
+    #glossary-section h3 { font-size: 1.05rem; font-weight: 600; margin: 1.5rem 0 0.75rem; color: #1a1a2e; }
+
+    .glossary-card {
+      background: #fff;
+      border: 1px solid #dee2e6;
+      border-radius: 8px;
+      padding: 0.85rem 1.1rem;
+      margin-bottom: 0.6rem;
+    }
+    .glossary-card.hidden { display: none; }
+    .glossary-term-name { font-weight: 600; font-size: 0.95rem; }
+    .glossary-definition { font-size: 0.85rem; color: #495057; margin-top: 0.2rem; }
+    .glossary-formula {
+      font-size: 0.8rem;
+      color: #6c757d;
+      font-family: monospace;
+      background: #f8f9fa;
+      padding: 0.2rem 0.4rem;
+      border-radius: 4px;
+      margin-top: 0.3rem;
+      display: inline-block;
+    }
+    .glossary-dashboards { font-size: 0.78rem; color: #6c757d; margin-top: 0.3rem; }
+    .glossary-dashboards a { color: #0d6efd; text-decoration: none; cursor: pointer; }
+    .glossary-dashboards a:hover { text-decoration: underline; }
+
+    .badge-category {
+      font-size: 0.68rem;
+      padding: 0.15rem 0.5rem;
+      border-radius: 10px;
+      background: #e9ecef;
+      color: #495057;
+      font-weight: 600;
+      margin-left: 0.4rem;
+      vertical-align: middle;
+    }
+    .badge-metric { background: #d1ecf1; color: #0c5460; }
+    .badge-glossary { background: #d4edda; color: #155724; }
+
+    #glossary-search-container { max-width: 320px; }
   </style>
 </head>
 <body>
@@ -90,7 +175,7 @@
 
 <!-- Filters + counts -->
 <div class="container mt-3">
-  <div class="d-flex align-items-center flex-wrap gap-2 mb-3">
+  <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
     <div class="btn-group" role="group" aria-label="Tool filter">
       <button class="btn btn-sm btn-outline-secondary filter-btn active" data-tool="all">All</button>
       <button class="btn btn-sm btn-outline-primary filter-btn" data-tool="tableau">Tableau</button>
@@ -99,6 +184,18 @@
     </div>
     <button id="stale-toggle" class="btn btn-sm btn-outline-warning">Stale only</button>
   </div>
+
+  <!-- Domain filter row -->
+  {% if all_domains %}
+  <div class="d-flex align-items-center flex-wrap gap-1 mb-2">
+    <div class="btn-group flex-wrap" role="group" aria-label="Domain filter">
+      <button class="btn btn-sm btn-outline-secondary domain-btn active" data-domain="all">All Domains</button>
+      {% for domain in all_domains %}
+      <button class="btn btn-sm btn-outline-secondary domain-btn" data-domain="{{ domain | lower }}">{{ domain }}</button>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
 
   <!-- Count summary -->
   <div class="counts-row d-flex flex-wrap gap-2 mb-3">
@@ -116,14 +213,20 @@
   </div>
   {% endif %}
 
-  <!-- Asset list -->
-  <div id="asset-list">
-    {% for asset in assets %}
+  <!-- Featured section -->
+  {% set featured_assets = assets | selectattr('featured') | list %}
+  {% if featured_assets %}
+  <div class="featured-section">
+    <div class="featured-label">&#9733; Featured</div>
+    {% for asset in featured_assets %}
     <div
       class="asset-card"
       data-tool="{{ asset.tool }}"
       data-status="{{ asset.status }}"
       data-name="{{ asset.name | lower }}"
+      data-domains="{{ asset.domains | join(',') | lower }}"
+      data-tags="{{ asset.tags | join(',') | lower }}"
+      data-featured="true"
     >
       <div>
         <div class="asset-name">
@@ -140,6 +243,79 @@
             Updated: unknown
           {% endif %}
         </div>
+        {% if asset.tags %}
+        <div class="mt-1">
+          {% for tag in asset.tags %}
+          <span class="tag-pill" data-tag="{{ tag | lower }}">{{ tag }}</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% if asset.related_terms %}
+        <div class="related-terms">
+          Related: {% for term in asset.related_terms %}<a href="#glossary-section" onclick="highlightTerm('{{ term | lower }}')">{{ term }}</a>{% if not loop.last %}, {% endif %}{% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      <div class="asset-actions">
+        <div class="asset-status">
+          {% if asset.status == 'active' %}
+            <span class="status-active">● Active</span>
+          {% elif asset.status == 'stale' %}
+            <span class="status-stale">▲ Stale</span>
+          {% else %}
+            <span class="status-unknown">● Unknown</span>
+          {% endif %}
+        </div>
+        {% if asset.url %}
+        <a href="{{ asset.url }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary">
+          Open in {{ asset.tool | capitalize }} →
+        </a>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Asset list -->
+  <div id="asset-list">
+    {% for asset in assets %}
+    <div
+      class="asset-card"
+      data-tool="{{ asset.tool }}"
+      data-status="{{ asset.status }}"
+      data-name="{{ asset.name | lower }}"
+      data-domains="{{ asset.domains | join(',') | lower }}"
+      data-tags="{{ asset.tags | join(',') | lower }}"
+      data-featured="{{ 'true' if asset.featured else 'false' }}"
+    >
+      <div>
+        <div class="asset-name">
+          <span class="badge badge-{{ asset.tool }} rounded-pill me-2" style="font-size:0.7rem;vertical-align:middle;">
+            {{ asset.tool | capitalize }}
+          </span>
+          {{ asset.name }}
+        </div>
+        <div class="asset-meta">
+          {% if asset.owner %}Owner: {{ asset.owner }} &nbsp;·&nbsp; {% endif %}
+          {% if asset.updated_at %}
+            Updated {{ asset.updated_at.strftime('%b %-d, %Y') }}
+          {% else %}
+            Updated: unknown
+          {% endif %}
+        </div>
+        {% if asset.tags %}
+        <div class="mt-1">
+          {% for tag in asset.tags %}
+          <span class="tag-pill" data-tag="{{ tag | lower }}">{{ tag }}</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% if asset.related_terms %}
+        <div class="related-terms">
+          Related: {% for term in asset.related_terms %}<a href="#glossary-section" onclick="highlightTerm('{{ term | lower }}')">{{ term }}</a>{% if not loop.last %}, {% endif %}{% endfor %}
+        </div>
+        {% endif %}
       </div>
       <div class="asset-actions">
         <div class="asset-status">
@@ -162,6 +338,82 @@
   </div>
 
   <div id="no-results">No dashboards match your filters.</div>
+
+  <!-- Glossary section -->
+  {% if glossary_terms %}
+  <div id="glossary-section">
+    <hr class="my-4" />
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+      <h2 class="mb-0">Glossary &amp; Metrics</h2>
+      <div id="glossary-search-container">
+        <input
+          id="glossary-search"
+          type="search"
+          class="form-control form-control-sm"
+          placeholder="Search glossary…"
+          autocomplete="off"
+        />
+      </div>
+    </div>
+
+    {% set glossary_only = glossary_terms | selectattr('type', 'equalto', 'glossary') | list %}
+    {% set metrics_only = glossary_terms | selectattr('type', 'equalto', 'metric') | list %}
+
+    {% if glossary_only %}
+    <h3>Glossary Terms</h3>
+    {% for term in glossary_only %}
+    <div
+      class="glossary-card"
+      data-term="{{ term.term | lower }}"
+      data-category="{{ term.category | lower }}"
+      data-type="glossary"
+    >
+      <div>
+        <span class="glossary-term-name">{{ term.term }}</span>
+        <span class="badge-category badge-glossary">{{ term.category }}</span>
+      </div>
+      <div class="glossary-definition">{{ term.definition }}</div>
+      {% if term.dashboards %}
+      <div class="glossary-dashboards">
+        Dashboards: {% for name in term.dashboards %}<a onclick="jumpToDashboard('{{ name | lower }}')">{{ name }}</a>{% if not loop.last %}, {% endif %}{% endfor %}
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    {% if metrics_only %}
+    <h3>Metrics</h3>
+    {% for term in metrics_only %}
+    <div
+      class="glossary-card"
+      data-term="{{ term.term | lower }}"
+      data-category="{{ term.category | lower }}"
+      data-type="metric"
+    >
+      <div>
+        <span class="glossary-term-name">{{ term.term }}</span>
+        <span class="badge-category badge-metric">{{ term.category }}</span>
+        {% for tag in term.tags[1:] %}
+        <span class="badge-category">{{ tag }}</span>
+        {% endfor %}
+      </div>
+      <div class="glossary-definition">{{ term.definition }}</div>
+      {% if term.formula %}
+      <div class="glossary-formula">{{ term.formula }}</div>
+      {% endif %}
+      {% if term.dashboards %}
+      <div class="glossary-dashboards">
+        Dashboards: {% for name in term.dashboards %}<a onclick="jumpToDashboard('{{ name | lower }}')">{{ name }}</a>{% if not loop.last %}, {% endif %}{% endfor %}
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+    {% endif %}
+
+  </div>
+  {% endif %}
+
 </div>
 
 <script>
@@ -169,11 +421,16 @@
   var searchEl = document.getElementById('search');
   var staleBtn = document.getElementById('stale-toggle');
   var filterBtns = document.querySelectorAll('.filter-btn');
-  var cards = document.querySelectorAll('.asset-card');
+  var domainBtns = document.querySelectorAll('.domain-btn');
+  var cards = document.querySelectorAll('#asset-list .asset-card');
   var noResults = document.getElementById('no-results');
   var countEl = document.getElementById('count-visible');
+  var glossarySearchEl = document.getElementById('glossary-search');
+  var glossaryCards = document.querySelectorAll('.glossary-card');
 
   var activeTool = 'all';
+  var activeDomain = 'all';
+  var activeTag = '';
   var staleOnly = false;
 
   function applyFilters() {
@@ -183,9 +440,15 @@
     cards.forEach(function (card) {
       var matchTool = activeTool === 'all' || card.dataset.tool === activeTool;
       var matchStale = !staleOnly || card.dataset.status === 'stale';
-      var matchSearch = !query || card.dataset.name.indexOf(query) !== -1;
+      var matchSearch = !query
+        || card.dataset.name.indexOf(query) !== -1
+        || card.dataset.tags.indexOf(query) !== -1;
+      var matchDomain = activeDomain === 'all'
+        || (card.dataset.domains && card.dataset.domains.split(',').indexOf(activeDomain) !== -1);
+      var matchTag = !activeTag
+        || (card.dataset.tags && card.dataset.tags.split(',').indexOf(activeTag) !== -1);
 
-      if (matchTool && matchStale && matchSearch) {
+      if (matchTool && matchStale && matchSearch && matchDomain && matchTag) {
         card.classList.remove('hidden');
         visible++;
       } else {
@@ -195,6 +458,17 @@
 
     countEl.textContent = visible;
     noResults.style.display = visible === 0 ? 'block' : 'none';
+  }
+
+  function applyGlossaryFilter() {
+    if (!glossarySearchEl) return;
+    var query = glossarySearchEl.value.toLowerCase().trim();
+    glossaryCards.forEach(function (card) {
+      var matchSearch = !query
+        || card.dataset.term.indexOf(query) !== -1
+        || card.dataset.category.indexOf(query) !== -1;
+      card.classList.toggle('hidden', !matchSearch);
+    });
   }
 
   // Tool filter buttons
@@ -207,6 +481,32 @@
     });
   });
 
+  // Domain filter buttons
+  domainBtns.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      domainBtns.forEach(function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      activeDomain = btn.dataset.domain;
+      applyFilters();
+    });
+  });
+
+  // Tag pill clicks (toggle)
+  document.addEventListener('click', function (e) {
+    if (!e.target.classList.contains('tag-pill')) return;
+    var tag = e.target.dataset.tag;
+    if (activeTag === tag) {
+      activeTag = '';
+      document.querySelectorAll('.tag-pill').forEach(function (p) { p.classList.remove('active'); });
+    } else {
+      activeTag = tag;
+      document.querySelectorAll('.tag-pill').forEach(function (p) {
+        p.classList.toggle('active', p.dataset.tag === tag);
+      });
+    }
+    applyFilters();
+  });
+
   // Stale toggle
   staleBtn.addEventListener('click', function () {
     staleOnly = !staleOnly;
@@ -217,7 +517,46 @@
 
   // Search
   searchEl.addEventListener('input', applyFilters);
+
+  // Glossary search
+  if (glossarySearchEl) {
+    glossarySearchEl.addEventListener('input', applyGlossaryFilter);
+  }
 })();
+
+function jumpToDashboard(name) {
+  // Clear all filters and search by dashboard name
+  var searchEl = document.getElementById('search');
+  searchEl.value = name;
+
+  // Reset tool filter
+  document.querySelectorAll('.filter-btn').forEach(function (b) { b.classList.remove('active'); });
+  var allBtn = document.querySelector('.filter-btn[data-tool="all"]');
+  if (allBtn) allBtn.classList.add('active');
+
+  // Reset domain filter
+  document.querySelectorAll('.domain-btn').forEach(function (b) { b.classList.remove('active'); });
+  var allDomainBtn = document.querySelector('.domain-btn[data-domain="all"]');
+  if (allDomainBtn) allDomainBtn.classList.add('active');
+
+  // Reset tag pills
+  document.querySelectorAll('.tag-pill').forEach(function (p) { p.classList.remove('active'); });
+
+  // Trigger filter update by dispatching input event
+  searchEl.dispatchEvent(new Event('input'));
+
+  // Scroll to asset list
+  var assetList = document.getElementById('asset-list');
+  if (assetList) assetList.scrollIntoView({ behavior: 'smooth' });
+}
+
+function highlightTerm(termLower) {
+  var glossarySearch = document.getElementById('glossary-search');
+  if (glossarySearch) {
+    glossarySearch.value = termLower;
+    glossarySearch.dispatchEvent(new Event('input'));
+  }
+}
 </script>
 
 </body>

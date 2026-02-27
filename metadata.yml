@@ -1,0 +1,11 @@
+featured:
+  - "Example Dashboard Name"   # replace with real names from the catalog
+
+domains:
+  Advertising: []
+  Content: []
+  Growth: []
+  Finance: []
+  Data Engineering: []
+
+tags: {}
