@@ -282,7 +282,10 @@
         style="background:#2d2d4a;border-color:#4a4a6a;color:#fff;"
       />
     </div>
-    <a href="#glossary-section" class="btn btn-sm btn-outline-light text-nowrap">Glossary ↓</a>
+    <div class="d-flex gap-2 align-items-center">
+      <button class="btn btn-sm btn-outline-light text-nowrap" data-bs-toggle="modal" data-bs-target="#settingsModal">⚙ Settings</button>
+      <a href="#glossary-section" class="btn btn-sm btn-outline-light text-nowrap">Glossary ↓</a>
+    </div>
   </div>
 </header>
 
@@ -380,6 +383,8 @@
         data-quality="{{ 'true' if asset.quality else 'false' }}"
         data-url="{{ asset.url | e }}"
         data-display-name="{{ asset.name | e }}"
+        data-override-by="{{ (asset.override_meta.updated_by) if asset.override_meta else '' }}"
+        data-override-at="{{ (asset.override_meta.updated_at) if asset.override_meta else '' }}"
       >
         <div>
           <div class="asset-name">
@@ -425,6 +430,8 @@
         data-quality="{{ 'true' if asset.quality else 'false' }}"
         data-url="{{ asset.url | e }}"
         data-display-name="{{ asset.name | e }}"
+        data-override-by="{{ (asset.override_meta.updated_by) if asset.override_meta else '' }}"
+        data-override-at="{{ (asset.override_meta.updated_at) if asset.override_meta else '' }}"
       >
         <div>
           <div class="asset-name">
@@ -514,7 +521,49 @@
 var CANONICAL_DOMAINS = {{ canonical_domains | tojson }};
 var DSA_PODS = {{ dsa_pods | tojson }};
 var POD_SLUG = {{ pod_slug | tojson }};
+// Server-baked overrides (from overrides.json at last build time)
+var SERVER_OVERRIDES = {{ overrides_json }};
+var REPO_OWNER = 'deRegtB';
+var REPO_NAME  = 'tubi-data-catalog';
 </script>
+
+<!-- Settings modal -->
+<div class="modal fade" id="settingsModal" tabindex="-1" aria-labelledby="settingsModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title" id="settingsModalLabel" style="font-size:0.9rem;">⚙ Settings — Override credentials</h6>
+        <button type="button" class="btn-close btn-sm" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted mb-3" style="font-size:0.8rem;">
+          Enter a GitHub Personal Access Token with <strong>Contents: Read &amp; Write</strong> on
+          <code>deRegtB/tubi-data-catalog</code>. Overrides will be committed to
+          <code>overrides.json</code> and the catalog will auto-rebuild in ~1 minute.
+          Your token is stored only in your browser (localStorage).
+        </p>
+        <div class="mb-3">
+          <label class="form-label fw-semibold" style="font-size:0.82rem;">Your name (shown in commit history)</label>
+          <input type="text" class="form-control form-control-sm" id="settingsName" placeholder="e.g. Bryan deRegt" />
+        </div>
+        <div class="mb-2">
+          <label class="form-label fw-semibold" style="font-size:0.82rem;">GitHub Personal Access Token</label>
+          <input type="password" class="form-control form-control-sm" id="settingsToken" placeholder="ghp_…" autocomplete="off" />
+          <div class="form-text" style="font-size:0.75rem;">
+            Create at <a href="https://github.com/settings/tokens" target="_blank" rel="noopener">github.com/settings/tokens</a>
+            — fine-grained token, Contents: Read &amp; Write on this repo only.
+          </div>
+        </div>
+        <div id="settingsStatus" class="mt-2" style="font-size:0.8rem;"></div>
+      </div>
+      <div class="modal-footer py-2">
+        <button type="button" class="btn btn-sm btn-outline-danger me-auto" id="clearCredsBtn">Clear stored credentials</button>
+        <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-sm btn-primary" id="saveCredsBtn">Save credentials</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- Edit modal -->
 <div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
@@ -541,7 +590,7 @@ var POD_SLUG = {{ pod_slug | tojson }};
             <label class="form-check-label" for="editFeaturedChk" style="font-size:0.82rem;">Featured / Recommended</label>
           </div>
         </div>
-        <div class="mb-1">
+        <div class="mb-2">
           <label class="form-label fw-semibold mb-1" style="font-size:0.82rem;">Status override</label>
           <select class="form-select form-select-sm" id="editStatusSelect">
             <option value="">Auto (based on last-updated date)</option>
@@ -550,6 +599,11 @@ var POD_SLUG = {{ pod_slug | tojson }};
             <option value="hidden">Hide from catalog</option>
           </select>
         </div>
+        <div class="mb-1">
+          <label class="form-label fw-semibold mb-1" style="font-size:0.82rem;">Note <span class="fw-normal text-muted">(optional — shown in git history)</span></label>
+          <input type="text" class="form-control form-control-sm" id="editNote" placeholder="e.g. Moved to Ads domain, deprecated" />
+        </div>
+        <div id="editOverrideInfo" class="mt-2" style="font-size:0.75rem;color:#6b7280;"></div>
       </div>
       <div class="modal-footer py-2">
         <button type="button" class="btn btn-sm btn-outline-danger me-auto" id="editClearBtn">Clear overrides</button>
@@ -745,15 +799,30 @@ var POD_SLUG = {{ pod_slug | tojson }};
     });
   }
 
-  // ── Override system ───────────────────────────────────────────────
-  var OVERRIDES_KEY = 'tubi-catalog-overrides';
-  var overrides = {};
-  try { overrides = JSON.parse(localStorage.getItem(OVERRIDES_KEY) || '{}'); } catch(e) {}
+  // ── Credentials (localStorage) ────────────────────────────────────
+  var CREDS_KEY = 'tubi-catalog-creds';
+  function getCreds() {
+    try { return JSON.parse(localStorage.getItem(CREDS_KEY) || '{}'); } catch(e) { return {}; }
+  }
+  function saveCreds(c) {
+    try { localStorage.setItem(CREDS_KEY, JSON.stringify(c)); } catch(e) {}
+  }
 
-  // Store original data-* values before any overrides apply
+  // ── Override system ───────────────────────────────────────────────
+  // SERVER_OVERRIDES = baked in at generation time (already applied server-side).
+  // Local overrides = pending edits not yet committed to the repo.
+  var LOCAL_KEY = 'tubi-catalog-local-overrides';
+  var localOverrides = {};
+  try { localOverrides = JSON.parse(localStorage.getItem(LOCAL_KEY) || '{}'); } catch(e) {}
+
+  function saveLocal() {
+    try { localStorage.setItem(LOCAL_KEY, JSON.stringify(localOverrides)); } catch(e) {}
+  }
+
+  // Store original server-rendered data-* before any JS modification
   var originals = {};
   document.querySelectorAll('.asset-card').forEach(function(card) {
-    var key = card.dataset.url || card.dataset.displayName;
+    var key = card.dataset.displayName;
     if (key) originals[key] = {
       domains:  card.dataset.domains,
       pods:     card.dataset.pods,
@@ -763,35 +832,42 @@ var POD_SLUG = {{ pod_slug | tojson }};
     };
   });
 
-  function saveOverrides() {
-    try { localStorage.setItem(OVERRIDES_KEY, JSON.stringify(overrides)); } catch(e) {}
-  }
-
-  function applyCardOverride(card, ov) {
-    if (ov.domains  !== undefined) card.dataset.domains  = ov.domains.join(',');
-    if (ov.pods     !== undefined) card.dataset.pods     = ov.pods.join(',');
-    if (ov.featured !== undefined) card.dataset.featured = ov.featured ? 'true' : 'false';
-    if (ov.status   !== undefined) {
-      if (ov.status === 'hidden') {
-        card.dataset.quality = 'false';
-      } else if (ov.status) {
-        card.dataset.status = ov.status;
-      }
+  function applyCardOverride(card, ov, synced) {
+    if (!ov) return;
+    if (ov.domains && ov.domains.length) card.dataset.domains = ov.domains.map(function(d){return d.toLowerCase();}).join(',');
+    if (ov.pods   && ov.pods.length)   card.dataset.pods    = ov.pods.join(',');
+    if (ov.featured !== undefined)     card.dataset.featured = ov.featured ? 'true' : 'false';
+    if (ov.status === 'hidden') {
+      card.dataset.quality = 'false';
+    } else if (ov.status) {
+      card.dataset.status = ov.status;
     }
-    // Mark card visually
-    if (!card.querySelector('.override-dot')) {
-      var dot = document.createElement('span');
-      dot.className = 'override-dot';
-      dot.title = 'Locally overridden — click ✏ to edit';
+    // Badge
+    var existing = card.querySelector('.override-dot');
+    if (existing) existing.remove();
+    var dot = document.createElement('span');
+    dot.className = 'override-dot';
+    var who = ov.updated_by || '';
+    var when = ov.updated_at ? (' on ' + ov.updated_at.slice(0,10)) : '';
+    if (synced === 'server') {
+      dot.title = 'Overridden by ' + (who || 'unknown') + when;
       dot.textContent = ' ✏';
-      dot.style.cssText = 'font-size:0.7rem;color:#f59e0b;';
-      var nameEl = card.querySelector('.asset-name');
-      if (nameEl) nameEl.appendChild(dot);
+      dot.style.cssText = 'font-size:0.7rem;color:#16a34a;';       // green = in repo
+    } else if (synced === 'repo') {
+      dot.title = 'Saved to repo by ' + (who || 'you') + ' — rebuilding…';
+      dot.textContent = ' ✏';
+      dot.style.cssText = 'font-size:0.7rem;color:#2563eb;';       // blue = committed
+    } else {
+      dot.title = 'Pending local override (not yet saved to repo)';
+      dot.textContent = ' ✏';
+      dot.style.cssText = 'font-size:0.7rem;color:#f59e0b;';       // amber = local only
     }
+    var nameEl = card.querySelector('.asset-name');
+    if (nameEl) nameEl.appendChild(dot);
   }
 
-  function restoreCardOriginal(card) {
-    var key = card.dataset.url || card.dataset.displayName;
+  function restoreCard(card) {
+    var key = card.dataset.displayName;
     var orig = originals[key];
     if (!orig) return;
     card.dataset.domains  = orig.domains;
@@ -805,10 +881,46 @@ var POD_SLUG = {{ pod_slug | tojson }};
 
   function applyAllOverrides() {
     document.querySelectorAll('.asset-card').forEach(function(card) {
-      var key = card.dataset.url || card.dataset.displayName;
-      if (key && overrides[key]) applyCardOverride(card, overrides[key]);
+      var name = card.dataset.displayName;
+      if (!name) return;
+      // Server-baked overrides (already reflected in data-* from Jinja but badge them)
+      if (card.dataset.overrideBy) {
+        applyCardOverride(card, {
+          updated_by: card.dataset.overrideBy,
+          updated_at: card.dataset.overrideAt,
+        }, 'server');
+      }
+      // Local pending overrides take precedence visually
+      if (localOverrides[name]) {
+        applyCardOverride(card, localOverrides[name], 'local');
+      }
     });
   }
+
+  // ── Settings modal ────────────────────────────────────────────────
+  document.getElementById('settingsModal').addEventListener('show.bs.modal', function() {
+    var c = getCreds();
+    document.getElementById('settingsName').value  = c.name  || '';
+    document.getElementById('settingsToken').value = c.token || '';
+    document.getElementById('settingsStatus').textContent = c.token ? '✓ Credentials stored.' : '';
+  });
+
+  document.getElementById('saveCredsBtn').addEventListener('click', function() {
+    var name  = document.getElementById('settingsName').value.trim();
+    var token = document.getElementById('settingsToken').value.trim();
+    saveCreds({ name: name, token: token });
+    document.getElementById('settingsStatus').textContent = '✓ Saved.';
+    setTimeout(function() {
+      bootstrap.Modal.getInstance(document.getElementById('settingsModal')).hide();
+    }, 800);
+  });
+
+  document.getElementById('clearCredsBtn').addEventListener('click', function() {
+    localStorage.removeItem(CREDS_KEY);
+    document.getElementById('settingsName').value  = '';
+    document.getElementById('settingsToken').value = '';
+    document.getElementById('settingsStatus').textContent = 'Credentials cleared.';
+  });
 
   // ── Edit modal ────────────────────────────────────────────────────
   var editModal = null;
@@ -841,21 +953,41 @@ var POD_SLUG = {{ pod_slug | tojson }};
     if (!card) return;
     editTargetCard = card;
 
-    // Populate modal with current values (with any override applied)
-    var key = card.dataset.url || card.dataset.displayName;
-    var ov = overrides[key] || {};
-    var currentDomains = ov.domains || (card.dataset.domains ? card.dataset.domains.split(',').filter(Boolean) : []);
-    var currentPod     = ov.pods && ov.pods.length ? ov.pods[0] : '';
+    var name = card.dataset.displayName || '';
+    // Priority: localOverrides > SERVER_OVERRIDES > card data-*
+    var localOv  = localOverrides[name] || {};
+    var serverOv = SERVER_OVERRIDES[name] || {};
+    var ov       = Object.assign({}, serverOv, localOv);
+
+    var currentDomains  = ov.domains || card.dataset.domains.split(',').filter(Boolean);
+    var currentPod      = (ov.pods && ov.pods[0]) || '';
     var currentFeatured = ov.featured !== undefined ? ov.featured : card.dataset.featured === 'true';
     var currentStatus   = ov.status || '';
+    var currentNote     = ov.note || '';
 
-    document.getElementById('editModalLabel').textContent = card.dataset.displayName || '';
+    document.getElementById('editModalLabel').textContent = name;
     domainChecksEl.querySelectorAll('input[type=checkbox]').forEach(function(cb) {
       cb.checked = currentDomains.indexOf(cb.value) !== -1;
     });
     podSelectEl.value = currentPod;
     document.getElementById('editFeaturedChk').checked = currentFeatured;
-    document.getElementById('editStatusSelect').value = currentStatus;
+    document.getElementById('editStatusSelect').value  = currentStatus;
+    document.getElementById('editNote').value          = currentNote;
+
+    // Show existing override provenance
+    var infoEl = document.getElementById('editOverrideInfo');
+    if (serverOv.updated_by) {
+      infoEl.textContent = '✏ Last saved by ' + serverOv.updated_by +
+        (serverOv.updated_at ? ' on ' + serverOv.updated_at.slice(0,10) : '') +
+        (serverOv.note ? ': "' + serverOv.note + '"' : '');
+    } else if (localOv.updated_by) {
+      infoEl.textContent = '⏳ Pending local save by ' + localOv.updated_by;
+    } else {
+      infoEl.textContent = '';
+    }
+
+    var creds = getCreds();
+    document.getElementById('editSaveBtn').textContent = creds.token ? 'Save to repo' : 'Save locally';
 
     if (!editModal) editModal = new bootstrap.Modal(document.getElementById('editModal'));
     editModal.show();
@@ -863,42 +995,119 @@ var POD_SLUG = {{ pod_slug | tojson }};
 
   document.getElementById('editSaveBtn').addEventListener('click', function() {
     if (!editTargetCard) return;
-    var key = editTargetCard.dataset.url || editTargetCard.dataset.displayName;
+    var name = editTargetCard.dataset.displayName;
     var selectedDomains = [];
     domainChecksEl.querySelectorAll('input[type=checkbox]:checked').forEach(function(cb) {
-      selectedDomains.push(cb.value);
+      selectedDomains.push(CANONICAL_DOMAINS.find(function(cd){ return cd.toLowerCase()===cb.value; }) || cb.value);
     });
     var pod = podSelectEl.value;
+    var creds = getCreds();
+    var now = new Date().toISOString();
     var ov = {
-      name:     editTargetCard.dataset.displayName,
-      domains:  selectedDomains,
-      pods:     pod ? [pod] : [],
-      featured: document.getElementById('editFeaturedChk').checked,
-      status:   document.getElementById('editStatusSelect').value,
+      domains:    selectedDomains,
+      pods:       pod ? [pod] : [],
+      featured:   document.getElementById('editFeaturedChk').checked,
+      status:     document.getElementById('editStatusSelect').value,
+      note:       document.getElementById('editNote').value.trim(),
+      updated_by: creds.name || 'anonymous',
+      updated_at: now,
     };
-    overrides[key] = ov;
-    saveOverrides();
-    restoreCardOriginal(editTargetCard);
-    applyCardOverride(editTargetCard, ov);
-    applyFilters();
-    editModal.hide();
+
+    if (creds.token) {
+      editModal.hide();
+      commitOverride(name, ov, creds.token, creds.name || 'anonymous');
+    } else {
+      localOverrides[name] = ov;
+      saveLocal();
+      restoreCard(editTargetCard);
+      applyCardOverride(editTargetCard, ov, 'local');
+      applyFilters();
+      editModal.hide();
+    }
   });
 
   document.getElementById('editClearBtn').addEventListener('click', function() {
     if (!editTargetCard) return;
-    var key = editTargetCard.dataset.url || editTargetCard.dataset.displayName;
-    delete overrides[key];
-    saveOverrides();
-    restoreCardOriginal(editTargetCard);
-    applyFilters();
+    var name = editTargetCard.dataset.displayName;
+    var creds = getCreds();
+    if (SERVER_OVERRIDES[name] && creds.token) {
+      // Remove from repo too
+      var merged = Object.assign({}, SERVER_OVERRIDES);
+      delete merged[name];
+      var msg = 'Remove override: ' + name + (creds.name ? ' — by ' + creds.name : '');
+      pushOverrides(merged, creds.token, msg).then(function() {
+        delete localOverrides[name]; saveLocal();
+        restoreCard(editTargetCard);
+        applyFilters();
+        showToast('Override removed and repo updated — rebuilding…', 'success');
+      }).catch(function(err) {
+        showToast('GitHub error: ' + err, 'danger');
+      });
+    } else {
+      delete localOverrides[name]; saveLocal();
+      restoreCard(editTargetCard);
+      applyFilters();
+    }
     editModal.hide();
   });
 
+  // ── GitHub API helpers ────────────────────────────────────────────
+  function commitOverride(dashName, ov, token, committer) {
+    showToast('Saving to repo…', 'info');
+    // Merge with current SERVER_OVERRIDES; local changes overlay on top
+    var merged = Object.assign({}, SERVER_OVERRIDES);
+    merged[dashName] = ov;
+    var note = ov.note ? ': "' + ov.note + '"' : '';
+    var msg = 'Override: ' + dashName + note + ' — by ' + committer;
+    pushOverrides(merged, token, msg).then(function() {
+      // Update local copy of server overrides so UI reflects it immediately
+      SERVER_OVERRIDES[dashName] = ov;
+      delete localOverrides[dashName]; saveLocal();
+      // Update card
+      var card = document.querySelector('.asset-card[data-display-name="' + dashName.replace(/"/g, '\\"') + '"]');
+      if (card) { restoreCard(card); applyCardOverride(card, ov, 'repo'); }
+      applyFilters();
+      showToast('✓ Saved to repo — catalog rebuilding in ~1 min', 'success');
+    }).catch(function(err) {
+      showToast('GitHub error: ' + err + '. Override saved locally instead.', 'warning');
+      localOverrides[dashName] = ov; saveLocal();
+      var card = document.querySelector('.asset-card[data-display-name="' + dashName.replace(/"/g, '\\"') + '"]');
+      if (card) { restoreCard(card); applyCardOverride(card, ov, 'local'); }
+      applyFilters();
+    });
+  }
+
+  function pushOverrides(overridesObj, token, commitMsg) {
+    var apiBase = 'https://api.github.com/repos/' + REPO_OWNER + '/' + REPO_NAME + '/contents/overrides.json';
+    return fetch(apiBase, { headers: { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json' } })
+      .then(function(r) { return r.json(); })
+      .then(function(current) {
+        var sha = current.sha;
+        var content = btoa(unescape(encodeURIComponent(JSON.stringify(overridesObj, null, 2) + '\n')));
+        return fetch(apiBase, {
+          method: 'PUT',
+          headers: {
+            Authorization: 'Bearer ' + token,
+            Accept: 'application/vnd.github+json',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ message: commitMsg, content: content, sha: sha }),
+        });
+      })
+      .then(function(r) {
+        if (!r.ok) return r.json().then(function(e) { throw (e.message || r.status); });
+        return r.json();
+      });
+  }
+
   // ── Export modal ──────────────────────────────────────────────────
   document.getElementById('exportModal').addEventListener('show.bs.modal', function() {
-    var keys = Object.keys(overrides);
-    document.getElementById('exportCount').textContent = keys.length + ' override(s) stored locally';
-    document.getElementById('exportYamlText').value = generateYaml();
+    var allOv = Object.assign({}, SERVER_OVERRIDES, localOverrides);
+    var keys = Object.keys(allOv);
+    document.getElementById('exportCount').textContent =
+      Object.keys(SERVER_OVERRIDES).length + ' in repo, ' +
+      Object.keys(localOverrides).length + ' pending locally';
+    document.getElementById('exportYamlText').value = generateYaml(allOv);
   });
 
   document.getElementById('exportCopyBtn').addEventListener('click', function() {
@@ -910,80 +1119,34 @@ var POD_SLUG = {{ pod_slug | tojson }};
   });
 
   document.getElementById('clearAllOverridesBtn').addEventListener('click', function() {
-    if (!confirm('Clear all locally-stored overrides? This cannot be undone.')) return;
-    overrides = {};
-    saveOverrides();
-    document.querySelectorAll('.asset-card').forEach(function(card) { restoreCardOriginal(card); });
+    if (!confirm('Clear all pending local overrides? (Repo-committed overrides are unaffected.)')) return;
+    localOverrides = {};
+    saveLocal();
+    document.querySelectorAll('.asset-card').forEach(function(card) {
+      var name = card.dataset.displayName;
+      if (!SERVER_OVERRIDES[name]) restoreCard(card);
+    });
     applyFilters();
     bootstrap.Modal.getInstance(document.getElementById('exportModal')).hide();
   });
 
-  function generateYaml() {
-    var featured = [], domains = {}, teams = {}, statusActive = [], statusStale = [], statusHidden = [];
-    Object.keys(overrides).forEach(function(key) {
-      var ov = overrides[key];
-      var name = ov.name || key;
-      if (ov.featured) featured.push(name);
-      (ov.domains || []).forEach(function(d) {
-        // Find the canonical-cased domain
-        var canonical = CANONICAL_DOMAINS.find(function(cd) { return cd.toLowerCase() === d; }) || d;
-        if (!domains[canonical]) domains[canonical] = [];
-        domains[canonical].push(name);
-      });
-      (ov.pods || []).forEach(function(p) {
-        if (!teams[p]) teams[p] = [];
-        teams[p].push(name);
-      });
-      if (ov.status === 'active')  statusActive.push(name);
-      if (ov.status === 'stale')   statusStale.push(name);
-      if (ov.status === 'hidden')  statusHidden.push(name);
-    });
-
-    var lines = ['# Paste these additions into metadata.yml, then commit to make permanent.', ''];
-
-    if (featured.length) {
-      lines.push('featured:');
-      featured.forEach(function(n) { lines.push('  - "' + n.replace(/"/g, '\\"') + '"'); });
-      lines.push('');
-    }
-    var domainKeys = Object.keys(domains);
-    if (domainKeys.length) {
-      lines.push('domains:');
-      domainKeys.forEach(function(d) {
-        lines.push('  ' + d + ':');
-        domains[d].forEach(function(n) { lines.push('    - "' + n.replace(/"/g, '\\"') + '"'); });
-      });
-      lines.push('');
-    }
-    var teamKeys = Object.keys(teams);
-    if (teamKeys.length) {
-      lines.push('teams:');
-      teamKeys.forEach(function(p) {
-        lines.push('  ' + p + ':');
-        teams[p].forEach(function(n) { lines.push('    - "' + n.replace(/"/g, '\\"') + '"'); });
-      });
-      lines.push('');
-    }
-    var hasStatus = statusActive.length || statusStale.length || statusHidden.length;
-    if (hasStatus) {
-      lines.push('status_override:');
-      if (statusActive.length) {
-        lines.push('  active:');
-        statusActive.forEach(function(n) { lines.push('    - "' + n.replace(/"/g, '\\"') + '"'); });
-      }
-      if (statusStale.length) {
-        lines.push('  stale:');
-        statusStale.forEach(function(n) { lines.push('    - "' + n.replace(/"/g, '\\"') + '"'); });
-      }
-      if (statusHidden.length) {
-        lines.push('  hidden:');
-        statusHidden.forEach(function(n) { lines.push('    - "' + n.replace(/"/g, '\\"') + '"'); });
-      }
-      lines.push('');
-    }
-
-    if (lines.length <= 2) return '# No overrides set yet.\n# Use the ✏ button on any dashboard card to add overrides.';
+  function generateYaml(allOv) {
+    if (!Object.keys(allOv).length) return '# No overrides yet.\n# Use the ✏ button on any card.';
+    var lines = ['# Snapshot of overrides.json — already applied via the repo.', '# For metadata.yml format, use Export in the sidebar.', ''];
+    lines.push(JSON.stringify(allOv, null, 2));
     return lines.join('\n');
+  }
+
+  // ── Toast helper ──────────────────────────────────────────────────
+  function showToast(msg, type) {
+    var t = document.createElement('div');
+    t.style.cssText = 'position:fixed;bottom:1.5rem;right:1.5rem;z-index:9999;' +
+      'padding:0.6rem 1rem;border-radius:8px;font-size:0.82rem;max-width:340px;' +
+      'background:' + ({success:'#16a34a',danger:'#dc2626',warning:'#d97706',info:'#2563eb'}[type]||'#374151') +
+      ';color:#fff;box-shadow:0 4px 12px rgba(0,0,0,.2);';
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(function() { t.remove(); }, 4500);
   }
 
   // ── Initial render ────────────────────────────────────────────────

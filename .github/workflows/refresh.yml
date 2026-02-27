@@ -4,6 +4,9 @@ on:
   schedule:
     - cron: '0 8 * * *'   # 8 AM UTC = midnight PST
   workflow_dispatch:       # Manual trigger from GitHub Actions UI
+  push:
+    paths:
+      - 'overrides.json'   # Auto-rebuild when overrides are saved from the catalog UI
 
 permissions:
   contents: read

@@ -1,5 +1,6 @@
 """Generate the Tubi Data Catalog static HTML page."""
 
+import json
 import os
 import sys
 import logging
@@ -296,6 +297,19 @@ def compute_status(asset: dict) -> str:
     return "stale"
 
 
+def load_overrides() -> dict:
+    """Load overrides.json — UI-driven per-dashboard overrides with author tracking."""
+    path = Path(__file__).parent / "overrides.json"
+    if not path.exists():
+        return {}
+    try:
+        with path.open() as f:
+            return json.load(f) or {}
+    except Exception as e:
+        logger.warning("overrides.json load failed: %s", e)
+        return {}
+
+
 def load_config() -> dict:
     keys = [
         "TABLEAU_SERVER_URL", "TABLEAU_SITE_ID", "TABLEAU_TOKEN_NAME", "TABLEAU_TOKEN_VALUE",
@@ -338,12 +352,13 @@ def load_metadata() -> dict:
     }
 
 
-def enrich_assets(assets: list[dict], metadata: dict) -> None:
+def enrich_assets(assets: list[dict], metadata: dict, overrides: dict | None = None) -> None:
     featured_names = metadata["featured"]
     name_to_domains = metadata["name_to_domains"]
     name_to_tags = metadata["name_to_tags"]
     name_to_pods = metadata["name_to_pods"]
     name_to_status = metadata["name_to_status"]
+    overrides = overrides or {}
     for asset in assets:
         name_lower = asset["name"].lower()
         asset["featured"] = any(f in name_lower for f in featured_names)
@@ -370,6 +385,26 @@ def enrich_assets(assets: list[dict], metadata: dict) -> None:
             asset["quality"] = False
         elif status_override in ("active", "stale", "unknown"):
             asset["status"] = status_override
+
+        # overrides.json — highest precedence, includes committer info
+        ov = overrides.get(asset["name"]) or overrides.get(name_lower)
+        asset["override_meta"] = None
+        if ov:
+            if ov.get("domains"):
+                asset["domains"] = ov["domains"]
+            if ov.get("pods"):
+                asset["pod_slugs"] = ov["pods"]
+            if ov.get("featured") is not None:
+                asset["featured"] = bool(ov["featured"])
+            if ov.get("status") == "hidden":
+                asset["quality"] = False
+            elif ov.get("status") in ("active", "stale", "unknown"):
+                asset["status"] = ov["status"]
+            asset["override_meta"] = {
+                "updated_by": ov.get("updated_by", ""),
+                "updated_at": ov.get("updated_at", ""),
+                "note": ov.get("note", ""),
+            }
 
 
 def link_glossary(terms: list[dict], assets: list[dict]) -> None:
@@ -416,9 +451,10 @@ def main() -> None:
     for asset in all_assets:
         asset["status"] = compute_status(asset)
 
-    # Load metadata and enrich assets
+    # Load metadata and overrides, then enrich assets
     metadata = load_metadata()
-    enrich_assets(all_assets, metadata)
+    overrides = load_overrides()
+    enrich_assets(all_assets, metadata, overrides)
 
     # Link glossary terms to assets
     link_glossary(glossary_terms, all_assets)
@@ -446,6 +482,7 @@ def main() -> None:
         pod_slug=_POD_SLUG,
         generated_at=generated_at,
         errors=errors,
+        overrides_json=json.dumps(overrides),
         counts={
             "total": len(all_assets),
             "tableau": sum(1 for a in all_assets if a["tool"] == "tableau"),
