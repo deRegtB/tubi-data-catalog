@@ -408,13 +408,32 @@ def enrich_assets(assets: list[dict], metadata: dict, overrides: dict | None = N
             }
 
 
+_STOPWORDS = {"of", "the", "a", "an", "by", "per", "in", "on", "at", "for",
+              "to", "and", "or", "is", "are", "be", "was", "were", "it", "its",
+              "as", "with", "from", "total", "number", "rate", "average", "avg"}
+
+
+def _keywords(text: str) -> set[str]:
+    """Return significant lowercase words (>3 chars, not stopwords)."""
+    return {w for w in text.lower().split() if len(w) > 3 and w not in _STOPWORDS}
+
+
 def link_glossary(terms: list[dict], assets: list[dict]) -> None:
     for term in terms:
         term_lower = term["term"].lower()
+        term_words = _keywords(term_lower)
         for asset in assets:
-            in_name = term_lower in asset["name"].lower()
-            in_description = term_lower in (asset.get("description") or "").lower()
-            if in_name or in_description:
+            name_lower = asset["name"].lower()
+            desc_lower = (asset.get("description") or "").lower()
+            tags_lower = " ".join(asset.get("tags") or []).lower()
+            combined   = f"{name_lower} {desc_lower} {tags_lower}"
+
+            # Exact substring match in name, description, or tags
+            exact = term_lower in combined
+            # Word-level match: all significant words in term appear somewhere in combined text
+            word_match = bool(term_words) and term_words.issubset(_keywords(combined))
+
+            if exact or word_match:
                 term["dashboards"].append(asset["name"])
                 asset["related_terms"].append(term["term"])
 
