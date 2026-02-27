@@ -29,9 +29,16 @@ def fetch(config: dict) -> list[dict]:
 
     try:
         dashboards = _paginate(f"{workspace_url}/api/v1/dashboard/", headers)
+        if dashboards:
+            sample_owners = dashboards[0].get("owners", [])
+            logger.info("Preset sample owner objects: %s", sample_owners[:2])
         for d in dashboards:
             owners = d.get("owners", [])
-            owner_name = owners[0].get("username") if owners else None
+            if owners:
+                o = owners[0]
+                owner_name = o.get("email") or o.get("username") or None
+            else:
+                owner_name = None
 
             # Preset stores URLs as relative paths
             relative_url = d.get("url", "")

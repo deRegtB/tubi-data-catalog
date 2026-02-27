@@ -1,6 +1,7 @@
 """Databricks Lakeview (AI/BI) Dashboard API client."""
 
 import logging
+import re
 import time
 from datetime import datetime, timezone
 
@@ -23,6 +24,10 @@ def fetch(config: dict) -> list[dict]:
 
     try:
         dashboards = _list_dashboards(host, headers)
+        if dashboards:
+            sample = dashboards[0]
+            logger.info("Databricks sample keys: %s", list(sample.keys()))
+            logger.info("Databricks sample path: %s", sample.get("path"))
         for d in dashboards:
             if d.get("lifecycle_state") == "TRASHED":
                 continue
@@ -33,11 +38,17 @@ def fetch(config: dict) -> list[dict]:
             # Prefer update_time, fall back to create_time
             updated_at = _parse_dt(d.get("update_time")) or _parse_dt(d.get("create_time"))
 
+            # Owner not a top-level field — extract email from workspace path
+            # e.g. /Users/email@tubi.tv/DashboardName → email@tubi.tv
+            path = d.get("path", "")
+            owner_match = re.search(r"/Users/([^/]+@[^/]+)/", path)
+            owner = owner_match.group(1) if owner_match else (d.get("owner") or None)
+
             assets.append({
                 "tool": "databricks",
                 "name": d.get("display_name", ""),
                 "description": None,
-                "owner": d.get("owner") or None,
+                "owner": owner,
                 "updated_at": updated_at,
                 "url": url,
                 "status": "unknown",
