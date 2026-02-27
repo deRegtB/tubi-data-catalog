@@ -49,6 +49,14 @@
 
     .filter-btn.active { font-weight: 700; }
 
+    /* Asset description */
+    .asset-description {
+      font-size: 0.8rem;
+      color: #495057;
+      margin-top: 0.25rem;
+      line-height: 1.4;
+    }
+
     #no-results {
       text-align: center;
       color: #6c757d;
@@ -183,6 +191,7 @@
       <button class="btn btn-sm btn-outline-warning filter-btn" data-tool="databricks">Databricks</button>
     </div>
     <button id="stale-toggle" class="btn btn-sm btn-outline-warning">Stale only</button>
+    <button id="quality-toggle" class="btn btn-sm btn-success">&#10003; Recommended only</button>
   </div>
 
   <!-- Domain filter row -->
@@ -227,6 +236,7 @@
       data-domains="{{ asset.domains | join(',') | lower }}"
       data-tags="{{ asset.tags | join(',') | lower }}"
       data-featured="true"
+      data-quality="{{ 'true' if asset.quality else 'false' }}"
     >
       <div>
         <div class="asset-name">
@@ -243,6 +253,9 @@
             Updated: unknown
           {% endif %}
         </div>
+        {% if asset.description %}
+        <div class="asset-description">{{ asset.description | truncate(150) }}</div>
+        {% endif %}
         {% if asset.tags %}
         <div class="mt-1">
           {% for tag in asset.tags %}
@@ -288,6 +301,7 @@
       data-domains="{{ asset.domains | join(',') | lower }}"
       data-tags="{{ asset.tags | join(',') | lower }}"
       data-featured="{{ 'true' if asset.featured else 'false' }}"
+      data-quality="{{ 'true' if asset.quality else 'false' }}"
     >
       <div>
         <div class="asset-name">
@@ -304,6 +318,9 @@
             Updated: unknown
           {% endif %}
         </div>
+        {% if asset.description %}
+        <div class="asset-description">{{ asset.description | truncate(150) }}</div>
+        {% endif %}
         {% if asset.tags %}
         <div class="mt-1">
           {% for tag in asset.tags %}
@@ -420,6 +437,7 @@
 (function () {
   var searchEl = document.getElementById('search');
   var staleBtn = document.getElementById('stale-toggle');
+  var qualityBtn = document.getElementById('quality-toggle');
   var filterBtns = document.querySelectorAll('.filter-btn');
   var domainBtns = document.querySelectorAll('.domain-btn');
   var cards = document.querySelectorAll('#asset-list .asset-card');
@@ -432,6 +450,7 @@
   var activeDomain = 'all';
   var activeTag = '';
   var staleOnly = false;
+  var qualityOnly = true;
 
   function applyFilters() {
     var query = searchEl.value.toLowerCase().trim();
@@ -447,8 +466,9 @@
         || (card.dataset.domains && card.dataset.domains.split(',').indexOf(activeDomain) !== -1);
       var matchTag = !activeTag
         || (card.dataset.tags && card.dataset.tags.split(',').indexOf(activeTag) !== -1);
+      var matchQuality = !qualityOnly || card.dataset.quality === 'true';
 
-      if (matchTool && matchStale && matchSearch && matchDomain && matchTag) {
+      if (matchTool && matchStale && matchSearch && matchDomain && matchTag && matchQuality) {
         card.classList.remove('hidden');
         visible++;
       } else {
@@ -512,6 +532,15 @@
     staleOnly = !staleOnly;
     staleBtn.classList.toggle('btn-warning', staleOnly);
     staleBtn.classList.toggle('btn-outline-warning', !staleOnly);
+    applyFilters();
+  });
+
+  // Quality toggle (default ON — hides noise)
+  qualityBtn.addEventListener('click', function () {
+    qualityOnly = !qualityOnly;
+    qualityBtn.classList.toggle('btn-success', qualityOnly);
+    qualityBtn.classList.toggle('btn-outline-secondary', !qualityOnly);
+    qualityBtn.textContent = qualityOnly ? '\u2713 Recommended only' : 'Show all dashboards';
     applyFilters();
   });
 

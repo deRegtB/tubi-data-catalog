@@ -40,10 +40,11 @@ def fetch(config: dict) -> list[dict]:
             assets.append({
                 "tool": "preset",
                 "name": d.get("dashboard_title", ""),
-                "description": None,
+                "description": d.get("description") or None,
                 "owner": owner_name,
                 "updated_at": _parse_dt(d.get("changed_on_utc") or d.get("changed_on")),
                 "url": full_url,
+                "published": d.get("published", True),
                 "status": "unknown",
             })
     except Exception as e:

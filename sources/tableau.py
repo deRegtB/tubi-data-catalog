@@ -41,6 +41,7 @@ def fetch(config: dict) -> list[dict]:
                 "owner": wb.get("owner", {}).get("name") or None,
                 "updated_at": _parse_dt(wb.get("updatedAt")),
                 "url": wb.get("webpageUrl", ""),
+                "project": wb.get("project", {}).get("name") or None,
                 "status": "unknown",
             })
     except Exception as e:

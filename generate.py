@@ -17,6 +17,28 @@ logger = logging.getLogger(__name__)
 
 STALE_DAYS = 30
 
+_BAD_NAME_PREFIXES = ("untitled", "copy of ", "[test]", "[draft]")
+_BAD_NAME_EXACT = {"test", "draft", "temp", "untitled", "untitled dashboard"}
+_BAD_NAME_SUBSTRINGS = ("\btmp\b",)
+
+
+def compute_quality(asset: dict) -> bool:
+    name = asset.get("name", "").strip()
+    if not name:
+        return False
+    n = name.lower()
+    if n in _BAD_NAME_EXACT:
+        return False
+    if any(n.startswith(p) for p in _BAD_NAME_PREFIXES):
+        return False
+    if n.startswith("test ") or n.endswith(" test"):
+        return False
+    if "tmp" == n or n.startswith("tmp ") or n.endswith(" tmp"):
+        return False
+    if asset.get("tool") == "preset" and not asset.get("published", True):
+        return False
+    return True
+
 
 def compute_status(asset: dict) -> str:
     updated_at = asset.get("updated_at")
@@ -64,15 +86,21 @@ def enrich_assets(assets: list[dict], metadata: dict) -> None:
         name_lower = asset["name"].lower()
         asset["featured"] = any(f in name_lower for f in featured_names)
         asset["domains"] = name_to_domains.get(name_lower, [])
+        # Auto-populate domain from Tableau project if not manually assigned
+        if not asset["domains"] and asset.get("project"):
+            asset["domains"] = [asset["project"]]
         asset["tags"] = name_to_tags.get(name_lower, [])
         asset["related_terms"] = []
+        asset["quality"] = compute_quality(asset)
 
 
 def link_glossary(terms: list[dict], assets: list[dict]) -> None:
     for term in terms:
         term_lower = term["term"].lower()
         for asset in assets:
-            if term_lower in asset["name"].lower():
+            in_name = term_lower in asset["name"].lower()
+            in_description = term_lower in (asset.get("description") or "").lower()
+            if in_name or in_description:
                 term["dashboards"].append(asset["name"])
                 asset["related_terms"].append(term["term"])
 
