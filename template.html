@@ -157,6 +157,17 @@
     .asset-name { font-weight: 600; font-size: 0.95rem; margin-bottom: 0.15rem; }
     .asset-meta { font-size: 0.78rem; color: #6b7280; }
     .asset-description { font-size: 0.78rem; color: #4b5563; margin-top: 0.2rem; line-height: 1.4; }
+    .domain-badge {
+      display: inline-block;
+      font-size: 0.7rem;
+      font-weight: 500;
+      padding: 0.1rem 0.45rem;
+      border-radius: 999px;
+      background: #ede9fe;
+      color: #5b21b6;
+      margin-right: 0.25rem;
+      vertical-align: middle;
+    }
     .asset-actions { flex-shrink: 0; text-align: right; }
     .asset-status  { margin-bottom: 0.35rem; font-size: 0.82rem; }
 
@@ -396,8 +407,10 @@
             {{ asset.name }}
           </div>
           <div class="asset-meta">
-            {% if asset.owner_display %}{{ asset.owner_display }} &nbsp;·&nbsp; {% endif %}
-            {% if asset.updated_at %}Updated {{ asset.updated_at.strftime('%b %-d, %Y') }}{% else %}Updated: unknown{% endif %}
+            {% if asset.domains %}{% for d in asset.domains %}<span class="domain-badge">{{ d }}</span>{% endfor %}{% endif %}
+            {% if asset.owner_display %}{{ asset.owner_display }}{% endif %}
+            {% if asset.owner_display and asset.updated_at %} &nbsp;·&nbsp; {% endif %}
+            {% if asset.updated_at %}Updated {{ asset.updated_at.strftime('%b %-d, %Y') }}{% endif %}
           </div>
           {% if asset.description %}<div class="asset-description">{{ asset.description | truncate(150) }}</div>{% endif %}
           {% if asset.tags %}<div class="mt-1">{% for tag in asset.tags %}<span class="tag-pill" data-tag="{{ tag | lower }}">{{ tag }}</span>{% endfor %}</div>{% endif %}
@@ -443,8 +456,10 @@
             {{ asset.name }}
           </div>
           <div class="asset-meta">
-            {% if asset.owner_display %}{{ asset.owner_display }} &nbsp;·&nbsp; {% endif %}
-            {% if asset.updated_at %}Updated {{ asset.updated_at.strftime('%b %-d, %Y') }}{% else %}Updated: unknown{% endif %}
+            {% if asset.domains %}{% for d in asset.domains %}<span class="domain-badge">{{ d }}</span>{% endfor %}{% endif %}
+            {% if asset.owner_display %}{{ asset.owner_display }}{% endif %}
+            {% if asset.owner_display and asset.updated_at %} &nbsp;·&nbsp; {% endif %}
+            {% if asset.updated_at %}Updated {{ asset.updated_at.strftime('%b %-d, %Y') }}{% endif %}
           </div>
           {% if asset.description %}<div class="asset-description">{{ asset.description | truncate(150) }}</div>{% endif %}
           {% if asset.tags %}<div class="mt-1">{% for tag in asset.tags %}<span class="tag-pill" data-tag="{{ tag | lower }}">{{ tag }}</span>{% endfor %}</div>{% endif %}
