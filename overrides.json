@@ -7,10 +7,10 @@
     "pods": [
       "core-experiences"
     ],
-    "featured": true,
+    "featured": false,
     "status": "",
     "note": "",
     "updated_by": "Bryan deRegt",
-    "updated_at": "2026-02-27T22:25:29.418Z"
+    "updated_at": "2026-02-27T22:42:14.699Z"
   }
 }
