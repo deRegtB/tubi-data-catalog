@@ -609,7 +609,7 @@ var ISSUES_TOKEN = '{{ issues_token | e }}';
           <input type="text" class="form-control form-control-sm" id="editNote" placeholder="e.g. This is an Ads dashboard, not General Tubi" />
         </div>
         <div class="mb-1" id="editRequesterRow">
-          <label class="form-label fw-semibold mb-1" style="font-size:0.82rem;">Your name <span class="fw-normal text-muted">(so Bryan knows who to follow up with)</span></label>
+          <label class="form-label fw-semibold mb-1" style="font-size:0.82rem;">Your name <span class="fw-normal text-muted">(optional — helps the reviewer follow up)</span></label>
           <input type="text" class="form-control form-control-sm" id="editRequesterName" placeholder="e.g. Jane Smith" />
         </div>
         <div id="editOverrideInfo" class="mt-2" style="font-size:0.75rem;color:#6b7280;"></div>
@@ -617,7 +617,7 @@ var ISSUES_TOKEN = '{{ issues_token | e }}';
       <div class="modal-footer py-2">
         <button type="button" class="btn btn-sm btn-outline-danger me-auto" id="editClearBtn">Clear overrides</button>
         <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-sm btn-outline-primary" id="editProposeBtn">Send request to Bryan</button>
+        <button type="button" class="btn btn-sm btn-outline-primary" id="editProposeBtn">Request update</button>
         <button type="button" class="btn btn-sm btn-primary" id="editSaveBtn" style="display:none;">Save to repo</button>
       </div>
     </div>
@@ -1112,7 +1112,7 @@ var ISSUES_TOKEN = '{{ issues_token | e }}';
     })
     .then(function(issue) {
       editModal.hide();
-      showToast('✓ Request #' + issue.number + ' submitted — Bryan will review it when ready.', 'success');
+      showToast('✓ Request #' + issue.number + ' submitted — a reviewer will apply it when ready.', 'success');
       loadPendingCount();
     })
     .catch(function(err) {
@@ -1120,7 +1120,7 @@ var ISSUES_TOKEN = '{{ issues_token | e }}';
     })
     .finally(function() {
       btn.disabled = false;
-      btn.textContent = 'Send request to Bryan';
+      btn.textContent = 'Request update';
     });
   });
 
