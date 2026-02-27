@@ -14,16 +14,14 @@
     "updated_at": "2026-02-27T22:25:29.418Z"
   },
   "Graduated Experiment Results": {
-    "domains": [
-      "Experimentation"
-    ],
+    "domains": [],
     "pods": [
       "experimentation"
     ],
-    "featured": true,
-    "status": "active",
-    "note": "",
+    "featured": false,
+    "status": "stale",
+    "note": "Dev version that should not be used",
     "updated_by": "Bryan deRegt",
-    "updated_at": "2026-02-27T22:45:27.595Z"
+    "updated_at": "2026-02-27T22:46:20.804Z"
   }
 }
