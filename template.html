@@ -283,6 +283,10 @@
       />
     </div>
     <div class="d-flex gap-2 align-items-center">
+      <a id="pending-badge" href="https://github.com/deRegtB/tubi-data-catalog/issues?q=is%3Aopen+label%3Aoverride-proposal"
+         target="_blank" rel="noopener"
+         class="btn btn-sm btn-warning text-dark text-nowrap fw-semibold"
+         style="display:none;">📋 <span id="pending-count">0</span> pending</a>
       <button class="btn btn-sm btn-outline-light text-nowrap" data-bs-toggle="modal" data-bs-target="#settingsModal">⚙ Settings</button>
       <a href="#glossary-section" class="btn btn-sm btn-outline-light text-nowrap">Glossary ↓</a>
     </div>
@@ -521,10 +525,10 @@
 var CANONICAL_DOMAINS = {{ canonical_domains | tojson }};
 var DSA_PODS = {{ dsa_pods | tojson }};
 var POD_SLUG = {{ pod_slug | tojson }};
-// Server-baked overrides (from overrides.json at last build time)
 var SERVER_OVERRIDES = {{ overrides_json }};
-var REPO_OWNER = 'deRegtB';
-var REPO_NAME  = 'tubi-data-catalog';
+var REPO_OWNER   = 'deRegtB';
+var REPO_NAME    = 'tubi-data-catalog';
+var ISSUES_TOKEN = '{{ issues_token | e }}';
 </script>
 
 <!-- Settings modal -->
@@ -537,10 +541,11 @@ var REPO_NAME  = 'tubi-data-catalog';
       </div>
       <div class="modal-body">
         <p class="text-muted mb-3" style="font-size:0.8rem;">
-          Enter a GitHub Personal Access Token with <strong>Contents: Read &amp; Write</strong> on
-          <code>deRegtB/tubi-data-catalog</code>. Overrides will be committed to
-          <code>overrides.json</code> and the catalog will auto-rebuild in ~1 minute.
-          Your token is stored only in your browser (localStorage).
+          <strong>For reviewers only</strong> (Bryan). Enter a GitHub PAT to apply override requests
+          directly from the catalog.<br>
+          Classic PAT with <code>repo</code> scope works fine.<br>
+          Overrides commit to <code>overrides.json</code> and the catalog rebuilds automatically in ~1 min.
+          Your token is stored only in your browser.
         </p>
         <div class="mb-3">
           <label class="form-label fw-semibold" style="font-size:0.82rem;">Your name (shown in commit history)</label>
@@ -600,15 +605,20 @@ var REPO_NAME  = 'tubi-data-catalog';
           </select>
         </div>
         <div class="mb-1">
-          <label class="form-label fw-semibold mb-1" style="font-size:0.82rem;">Note <span class="fw-normal text-muted">(optional — shown in git history)</span></label>
-          <input type="text" class="form-control form-control-sm" id="editNote" placeholder="e.g. Moved to Ads domain, deprecated" />
+          <label class="form-label fw-semibold mb-1" style="font-size:0.82rem;">Note <span class="fw-normal text-muted">(optional)</span></label>
+          <input type="text" class="form-control form-control-sm" id="editNote" placeholder="e.g. This is an Ads dashboard, not General Tubi" />
+        </div>
+        <div class="mb-1" id="editRequesterRow">
+          <label class="form-label fw-semibold mb-1" style="font-size:0.82rem;">Your name <span class="fw-normal text-muted">(so Bryan knows who to follow up with)</span></label>
+          <input type="text" class="form-control form-control-sm" id="editRequesterName" placeholder="e.g. Jane Smith" />
         </div>
         <div id="editOverrideInfo" class="mt-2" style="font-size:0.75rem;color:#6b7280;"></div>
       </div>
       <div class="modal-footer py-2">
         <button type="button" class="btn btn-sm btn-outline-danger me-auto" id="editClearBtn">Clear overrides</button>
         <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-sm btn-primary" id="editSaveBtn">Save</button>
+        <button type="button" class="btn btn-sm btn-outline-primary" id="editProposeBtn">Send request to Bryan</button>
+        <button type="button" class="btn btn-sm btn-primary" id="editSaveBtn" style="display:none;">Save to repo</button>
       </div>
     </div>
   </div>
@@ -987,44 +997,158 @@ var REPO_NAME  = 'tubi-data-catalog';
     }
 
     var creds = getCreds();
-    document.getElementById('editSaveBtn').textContent = creds.token ? 'Save to repo' : 'Save locally';
+    // Reviewer (has PAT): show Save to repo, hide requester name field
+    // Everyone else: show requester name field, hide Save to repo
+    var hasPat = !!creds.token;
+    document.getElementById('editSaveBtn').style.display    = hasPat ? ''       : 'none';
+    document.getElementById('editRequesterRow').style.display = hasPat ? 'none' : '';
+    if (!hasPat) document.getElementById('editRequesterName').value = '';
 
     if (!editModal) editModal = new bootstrap.Modal(document.getElementById('editModal'));
     editModal.show();
   });
 
-  document.getElementById('editSaveBtn').addEventListener('click', function() {
-    if (!editTargetCard) return;
-    var name = editTargetCard.dataset.displayName;
+  function collectEditForm() {
     var selectedDomains = [];
     domainChecksEl.querySelectorAll('input[type=checkbox]:checked').forEach(function(cb) {
       selectedDomains.push(CANONICAL_DOMAINS.find(function(cd){ return cd.toLowerCase()===cb.value; }) || cb.value);
     });
-    var pod = podSelectEl.value;
+    return {
+      domains:  selectedDomains,
+      pods:     podSelectEl.value ? [podSelectEl.value] : [],
+      featured: document.getElementById('editFeaturedChk').checked,
+      status:   document.getElementById('editStatusSelect').value,
+      note:     document.getElementById('editNote').value.trim(),
+    };
+  }
+
+  // Save to repo (PAT required — button only shown when PAT is set)
+  document.getElementById('editSaveBtn').addEventListener('click', function() {
+    if (!editTargetCard) return;
+    var name = editTargetCard.dataset.displayName;
     var creds = getCreds();
-    var now = new Date().toISOString();
-    var ov = {
-      domains:    selectedDomains,
-      pods:       pod ? [pod] : [],
-      featured:   document.getElementById('editFeaturedChk').checked,
-      status:     document.getElementById('editStatusSelect').value,
-      note:       document.getElementById('editNote').value.trim(),
+    var ov = Object.assign(collectEditForm(), {
       updated_by: creds.name || 'anonymous',
-      updated_at: now,
+      updated_at: new Date().toISOString(),
+    });
+    editModal.hide();
+    commitOverride(name, ov, creds.token, creds.name || 'anonymous');
+  });
+
+  // Send request — creates a GitHub Issue (scoped token, Issues: Write only)
+  document.getElementById('editProposeBtn').addEventListener('click', function() {
+    if (!editTargetCard) return;
+    var name      = editTargetCard.dataset.displayName;
+    var card      = editTargetCard;
+    var form      = collectEditForm();
+    var requester = document.getElementById('editRequesterName').value.trim() || 'anonymous';
+
+    if (!ISSUES_TOKEN) {
+      showToast('Request queue not configured — ask Bryan to add GITHUB_ISSUES_TOKEN to repo secrets.', 'warning');
+      return;
+    }
+
+    var slug_to_name = {};
+    DSA_PODS.forEach(function(p){ slug_to_name[POD_SLUG[p]] = p; });
+
+    var currentDomains = card.dataset.domains.split(',').filter(Boolean).map(function(d) {
+      return CANONICAL_DOMAINS.find(function(c){ return c.toLowerCase() === d; }) || d;
+    }).join(', ') || '—';
+    var currentPodSlug  = card.dataset.pods.split(',').filter(Boolean)[0] || '';
+    var currentPodName  = slug_to_name[currentPodSlug] || currentPodSlug || 'Non-DSA';
+    var proposedPodName = form.pods[0] ? (slug_to_name[form.pods[0]] || form.pods[0]) : '—';
+
+    // Store proposed values as JSON in a fenced code block so the reviewer
+    // can parse them precisely and apply in one click from the catalog.
+    var payload = {
+      dashboard:  name,
+      domains:    form.domains,
+      pods:       form.pods,
+      featured:   form.featured,
+      status:     form.status,
+      note:       form.note,
+      requester:  requester,
+      url:        card.dataset.url || '',
     };
 
-    if (creds.token) {
+    var body = [
+      '**Requested by:** ' + requester,
+      '**Dashboard:** ' + name,
+      (card.dataset.url ? '**Dashboard URL:** ' + card.dataset.url : ''),
+      '',
+      '| Field | Current | Proposed |',
+      '|---|---|---|',
+      '| Domains | ' + currentDomains + ' | ' + (form.domains.join(', ') || '—') + ' |',
+      '| Team | '   + currentPodName  + ' | ' + proposedPodName + ' |',
+      '| Featured | ' + (card.dataset.featured === 'true' ? 'Yes' : 'No') + ' | ' + (form.featured ? 'Yes' : 'No') + ' |',
+      '| Status | '  + (card.dataset.status || 'auto') + ' | ' + (form.status || 'auto') + ' |',
+      (form.note ? '\n**Note:** ' + form.note : ''),
+      '',
+      '```json',
+      JSON.stringify(payload, null, 2),
+      '```',
+    ].filter(function(l){ return l !== undefined; }).join('\n');
+
+    var btn = document.getElementById('editProposeBtn');
+    btn.disabled = true;
+    btn.textContent = 'Submitting…';
+
+    fetch('https://api.github.com/repos/' + REPO_OWNER + '/' + REPO_NAME + '/issues', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + ISSUES_TOKEN,
+        'Accept': 'application/vnd.github+json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        title:  'Override request: ' + name,
+        body:   body,
+        labels: ['override-proposal'],
+      }),
+    })
+    .then(function(r) {
+      if (!r.ok) return r.json().then(function(e) { throw e.message || r.status; });
+      return r.json();
+    })
+    .then(function(issue) {
       editModal.hide();
-      commitOverride(name, ov, creds.token, creds.name || 'anonymous');
-    } else {
-      localOverrides[name] = ov;
-      saveLocal();
-      restoreCard(editTargetCard);
-      applyCardOverride(editTargetCard, ov, 'local');
-      applyFilters();
-      editModal.hide();
-    }
+      showToast('✓ Request #' + issue.number + ' submitted — Bryan will review it when ready.', 'success');
+      loadPendingCount();
+    })
+    .catch(function(err) {
+      showToast('Could not submit request: ' + err, 'danger');
+    })
+    .finally(function() {
+      btn.disabled = false;
+      btn.textContent = 'Send request to Bryan';
+    });
   });
+
+  // ── Pending-request badge ─────────────────────────────────────────
+  function loadPendingCount() {
+    if (!ISSUES_TOKEN) return;
+    fetch('https://api.github.com/repos/' + REPO_OWNER + '/' + REPO_NAME +
+          '/issues?labels=override-proposal&state=open&per_page=1', {
+      headers: { 'Authorization': 'Bearer ' + ISSUES_TOKEN, 'Accept': 'application/vnd.github+json' },
+    })
+    .then(function(r) {
+      var total = parseInt(r.headers.get('Link') ? r.headers.get('Link').match(/page=(\d+)>; rel="last"/) && RegExp.$1 : 1, 10) || 0;
+      // Simpler: just check if there are any results
+      return r.json().then(function(issues) { return issues.length; });
+    })
+    .then(function(count) {
+      var badge = document.getElementById('pending-badge');
+      var countEl = document.getElementById('pending-count');
+      if (count > 0) {
+        countEl.textContent = count;
+        badge.style.display = '';
+      } else {
+        badge.style.display = 'none';
+      }
+    })
+    .catch(function() {}); // silently fail if token invalid or no network
+  }
+  loadPendingCount();
 
   document.getElementById('editClearBtn').addEventListener('click', function() {
     if (!editTargetCard) return;

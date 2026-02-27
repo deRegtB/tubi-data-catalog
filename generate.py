@@ -316,6 +316,7 @@ def load_config() -> dict:
         "PRESET_API_KEY", "PRESET_API_SECRET", "PRESET_WORKSPACE_URL",
         "DATABRICKS_HOST", "DATABRICKS_TOKEN",
         "GLOSSARY_GITHUB_TOKEN",
+        "GITHUB_ISSUES_TOKEN",
     ]
     return {k: os.environ.get(k, "") for k in keys}
 
@@ -483,6 +484,7 @@ def main() -> None:
         generated_at=generated_at,
         errors=errors,
         overrides_json=json.dumps(overrides),
+        issues_token=config.get("GITHUB_ISSUES_TOKEN", ""),
         counts={
             "total": len(all_assets),
             "tableau": sum(1 for a in all_assets if a["tool"] == "tableau"),
