@@ -21,13 +21,13 @@ def fetch(config: dict) -> list[dict]:
         return []
 
     try:
-        token, site_content_url = _signin(server_url, site_id, token_name, token_value)
+        token, site_luid = _signin(server_url, site_id, token_name, token_value)
     except Exception as e:
         logger.error("Tableau auth failed: %s", e)
         return []
 
     headers = {"x-tableau-auth": token, "Accept": "application/json"}
-    base = f"{server_url}/api/3.21/sites/{site_id}"
+    base = f"{server_url}/api/3.21/sites/{site_luid}"
 
     assets = []
 
@@ -67,8 +67,8 @@ def _signin(server_url: str, site_id: str, token_name: str, token_value: str) ->
     resp.raise_for_status()
     data = resp.json()
     token = data["credentials"]["token"]
-    site_content_url = data["credentials"]["site"]["contentUrl"]
-    return token, site_content_url
+    site_luid = data["credentials"]["site"]["id"]  # UUID, required for subsequent API calls
+    return token, site_luid
 
 
 def _signout(server_url: str, token: str) -> None:

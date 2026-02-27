@@ -57,7 +57,11 @@ def _login(api_key: str, api_secret: str) -> str:
     url = "https://api.app.preset.io/v1/auth/"
     resp = requests.post(url, json={"name": api_key, "secret": api_secret}, timeout=30)
     resp.raise_for_status()
-    return resp.json()["payload"]["token"]
+    payload = resp.json().get("payload", {})
+    token = payload.get("access_token") or payload.get("token")
+    if not token:
+        raise ValueError(f"No token in Preset auth response. Keys: {list(payload.keys())}")
+    return token
 
 
 def _paginate(url: str, headers: dict) -> list[dict]:
