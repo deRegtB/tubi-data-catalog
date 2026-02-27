@@ -17,6 +17,132 @@ logger = logging.getLogger(__name__)
 
 STALE_DAYS = 30
 
+CANONICAL_DOMAINS = [
+    "General Tubi",
+    "Core Experiences",
+    "Viewer Growth",
+    "Finance & BizOps",
+    "Experimentation",
+    "Ads",
+    "DiscoAI",
+    "Infra/Tools",
+    "Content",
+]
+
+# Maps every known Tableau project name → canonical domain.
+# None means personal/sandbox — fall through to keyword matching.
+_PROJECT_TO_DOMAIN = {
+    "2. DEVELOPMENT":                                    "Infra/Tools",
+    "Accounting":                                        "Finance & BizOps",
+    "Admin Insights":                                    "General Tubi",
+    "Ads_Account Management Tools":                      "Ads",
+    "Ads_Ad Deactiviation Dashboard (S&P)":              "Ads",
+    "Ads_Ad Monetization Dashboards":                    "Ads",
+    "Ads_AdOps Tools":                                   "Ads",
+    "Certified KPIs":                                    "General Tubi",
+    "Complex Dashboard Templates":                       "Infra/Tools",
+    "Content Partnerships":                              "Content",
+    "Core Dashboards":                                   "General Tubi",
+    "Core Experiences":                                  "Core Experiences",
+    "Dashboard Templates & Style Guide":                 "Infra/Tools",
+    "Dev_Ads":                                           "Ads",
+    "Dev_Ads_Account Management Tools":                  "Ads",
+    "Dev_Ads_Ad Deactiviation Dashboard (S&P)":          "Ads",
+    "Dev_Ads_Ad Monetization Dashboards":                "Ads",
+    "Dev_Ads_AdOps Tools":                               "Ads",
+    "Dev_Ads_Product Tools":                             "Ads",
+    "Dev_Ads_Sales Ops Tools":                           "Ads",
+    "Dev_Ads_Yield":                                     "Ads",
+    "Dev_BizOps":                                        "Finance & BizOps",
+    "Dev_Content":                                       "Content",
+    "Dev_Content_Analytics":                             "Content",
+    "Dev_DSA":                                           "General Tubi",
+    "Dev_DSA Viewer Growth":                             "Viewer Growth",
+    "Dev_DSA_Core_Experience_Retention":                 "Core Experiences",
+    "Dev_Ecosystems_Experiments and Holdouts":           "Experimentation",
+    "Dev_Ecosystems_Finance":                            "Finance & BizOps",
+    "Dev_Finance & BizOps":                              "Finance & BizOps",
+    "Dev_Growth Analytics_Adhoc_Analysis":               "Viewer Growth",
+    "Dev_Growth Analytics_Core Dashboards":              "Viewer Growth",
+    "Dev_Growth Analytics_Retargeting":                  "Viewer Growth",
+    "Dev_Tubi KPIs (Certified)_Distribution Dashboard":  "General Tubi",
+    "Ecosystems_Finance":                                "Finance & BizOps",
+    "Experimentation":                                   "Experimentation",
+    "FP&A":                                              "Finance & BizOps",
+    "Month End Close":                                   "Finance & BizOps",
+    "PRO Reporting":                                     "Ads",
+    "Revenue Accounting":                                "Finance & BizOps",
+    "Rightsline":                                        "Content",
+    "Samples":                                           "Infra/Tools",
+    "Sandbox":                                           "Infra/Tools",
+    "Simple Dashboard Templates":                        "Infra/Tools",
+    "Test Workbooks and Data Sources":                   "Infra/Tools",
+    "default":                                           "General Tubi",
+    # Personal folders — no project domain, try keyword fallback
+    "Xueling Chen":                                      None,
+    "Yuting Chen":                                       None,
+}
+
+# Keyword rules for Preset/Databricks (and Tableau with unrecognised projects).
+# All matching rules contribute — a dashboard can get multiple domains.
+_KEYWORD_DOMAIN_RULES = [
+    (["experiment", "a/b", "holdout", "treatment vs", "ab test", "control group"],
+     "Experimentation"),
+    (["adops", "ad ops", "ad monetiz", "ad account", "ad deactiv", "ad product",
+      "yield", "programmatic", "avod", "ecpm", "fill rate", "impression",
+      "advertis", "sales ops", "cpm"],
+     "Ads"),
+    (["discoai", "disco ai", "recommendation", "personali", "content ranking",
+      "ml model", "algorithmic"],
+     "DiscoAI"),
+    (["fp&a", "month end", "revenue account", "content licensing",
+      "rights management", "rightsline", "finance", "accounting",
+      "bizops", "biz ops", "budget forecast"],
+     "Finance & BizOps"),
+    (["content catalog", "content partner", "title catalog", "show catalog",
+      "content rights", "content licensing"],
+     "Content"),
+    (["viewer growth", "user growth", "user acquisition", "user retention",
+      "churn", "new user", "signup", "registr",
+      "dau", "mau", "wau", "daily active", "monthly active", "weekly active"],
+     "Viewer Growth"),
+    (["core experience", "playback", "video start", "buffering",
+      "video player", "watch session"],
+     "Core Experiences"),
+    (["data quality", "data pipeline", "data infra", "data engineering",
+      "dbt", "airflow", "etl", "infra monitor", "tooling", "admin tool"],
+     "Infra/Tools"),
+    (["certified kpi", "north star", "executive", "company kpi",
+      "tubi kpi", "tubi overview", "company overview"],
+     "General Tubi"),
+]
+
+
+def _infer_domains(asset: dict) -> list[str]:
+    """Map an asset to one or more canonical domains."""
+    # 1. Tableau project mapping (authoritative when known)
+    project = asset.get("project")
+    if project and project in _PROJECT_TO_DOMAIN:
+        mapped = _PROJECT_TO_DOMAIN[project]
+        if mapped:
+            return [mapped]
+        # None → personal folder; fall through to keyword matching
+
+    # 2. Keyword matching on name
+    name_lower = asset.get("name", "").lower()
+    domains: list[str] = []
+    for keywords, domain in _KEYWORD_DOMAIN_RULES:
+        if any(kw in name_lower for kw in keywords):
+            if domain not in domains:
+                domains.append(domain)
+
+    # 3. General Tubi catch-all so every dashboard has at least one domain
+    if not domains:
+        domains = ["General Tubi"]
+
+    return domains
+
+
 _BAD_NAME_PREFIXES = ("untitled", "copy of ", "[test]", "[draft]")
 _BAD_NAME_EXACT = {"test", "draft", "temp", "untitled", "untitled dashboard"}
 _BAD_NAME_SUBSTRINGS = ("\btmp\b",)
@@ -85,10 +211,8 @@ def enrich_assets(assets: list[dict], metadata: dict) -> None:
     for asset in assets:
         name_lower = asset["name"].lower()
         asset["featured"] = any(f in name_lower for f in featured_names)
-        asset["domains"] = name_to_domains.get(name_lower, [])
-        # Auto-populate domain from Tableau project if not manually assigned
-        if not asset["domains"] and asset.get("project"):
-            asset["domains"] = [asset["project"]]
+        # Manual metadata.yml override takes precedence; otherwise infer
+        asset["domains"] = name_to_domains.get(name_lower, []) or _infer_domains(asset)
         asset["tags"] = name_to_tags.get(name_lower, [])
         asset["related_terms"] = []
         asset["quality"] = compute_quality(asset)
@@ -145,8 +269,8 @@ def main() -> None:
     # Link glossary terms to assets
     link_glossary(glossary_terms, all_assets)
 
-    # Collect all domains across assets
-    all_domains = sorted({d for asset in all_assets for d in asset["domains"]})
+    # Use canonical domain list for the filter (fixed order, always all 9)
+    all_domains = CANONICAL_DOMAINS
 
     # Sort: active first, then stale, then unknown; within each group featured first, then by name
     status_order = {"active": 0, "stale": 1, "unknown": 2}

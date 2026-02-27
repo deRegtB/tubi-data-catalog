@@ -1,11 +1,19 @@
-featured:
-  - "Example Dashboard Name"   # replace with real names from the catalog
+# Manual overrides — domain/tag/featured assignments by dashboard name (case-insensitive substring).
+# Automatic domain inference from Tableau projects + keyword matching handles most dashboards.
+# Add entries here only when you need to override the inferred domain.
+
+featured: []
+  # - "Dashboard Name Here"
 
 domains:
-  Advertising: []
+  General Tubi: []
+  Core Experiences: []
+  Viewer Growth: []
+  Finance & BizOps: []
+  Experimentation: []
+  Ads: []
+  DiscoAI: []
+  Infra/Tools: []
   Content: []
-  Growth: []
-  Finance: []
-  Data Engineering: []
 
 tags: {}
