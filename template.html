@@ -240,7 +240,8 @@
       margin-bottom: 0.5rem;
     }
     .glossary-card.hidden { display: none; }
-    .glossary-term-name { font-weight: 600; font-size: 0.9rem; }
+    .glossary-term-name { font-weight: 600; font-size: 0.9rem; color: inherit; text-decoration: none; }
+    .glossary-term-name:hover { text-decoration: underline; color: #2563eb; }
     .glossary-definition { font-size: 0.82rem; color: #4b5563; margin-top: 0.15rem; }
     .glossary-formula {
       font-size: 0.78rem; color: #6b7280; font-family: monospace;
@@ -500,7 +501,7 @@
       {% for term in glossary_only %}
       <div class="glossary-card" data-term="{{ term.term | lower }}" data-category="{{ term.category | lower }}" data-type="glossary">
         <div>
-          <span class="glossary-term-name">{{ term.term }}</span>
+          {% if term.source_url %}<a href="{{ term.source_url }}" target="_blank" rel="noopener" class="glossary-term-name">{{ term.term }} ↗</a>{% else %}<span class="glossary-term-name">{{ term.term }}</span>{% endif %}
           <span class="badge-category badge-glossary">{{ term.category }}</span>
         </div>
         <div class="glossary-definition">{{ term.definition }}</div>
@@ -516,7 +517,7 @@
       {% for term in metrics_only %}
       <div class="glossary-card" data-term="{{ term.term | lower }}" data-category="{{ term.category | lower }}" data-type="metric">
         <div>
-          <span class="glossary-term-name">{{ term.term }}</span>
+          {% if term.source_url %}<a href="{{ term.source_url }}" target="_blank" rel="noopener" class="glossary-term-name">{{ term.term }} ↗</a>{% else %}<span class="glossary-term-name">{{ term.term }}</span>{% endif %}
           <span class="badge-category badge-metric">{{ term.category }}</span>
           {% for tag in term.tags[1:] %}<span class="badge-category">{{ tag }}</span>{% endfor %}
         </div>

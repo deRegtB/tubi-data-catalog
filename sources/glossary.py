@@ -33,7 +33,8 @@ def fetch(config) -> list[dict]:
                     continue
                 try:
                     raw = _decode_file(f)
-                    term = _parse_sql_file(f["name"], raw, category)
+                    source_url = f"https://github.com/{REPO}/blob/main/{f['path']}"
+                    term = _parse_sql_file(f["name"], raw, category, source_url)
                     if term:
                         terms.append(term)
                 except Exception as e:
@@ -60,7 +61,7 @@ def _decode_file(file_entry: dict) -> str:
         return raw_bytes.decode("latin-1")
 
 
-def _parse_sql_file(filename: str, content: str, category: str) -> dict | None:
+def _parse_sql_file(filename: str, content: str, category: str, source_url: str = "") -> dict | None:
     # Term name: strip .sql extension, replace underscores with spaces
     name = filename
     if name.lower().endswith(".sql"):
@@ -98,6 +99,7 @@ def _parse_sql_file(filename: str, content: str, category: str) -> dict | None:
         "type": "metric" if category == "Metric" else "glossary",
         "tags": [category],
         "formula": sql,
+        "source_url": source_url,
         "related_term_keys": [],
         "dashboards": [],
     }
