@@ -1,1 +1,16 @@
-{}
+{
+  "[FY26 H2] Core Experiences Experimentation Velocity": {
+    "domains": [
+      "Core Experiences",
+      "Experimentation"
+    ],
+    "pods": [
+      "core-experiences"
+    ],
+    "featured": true,
+    "status": "",
+    "note": "",
+    "updated_by": "Bryan deRegt",
+    "updated_at": "2026-02-27T22:25:29.418Z"
+  }
+}
