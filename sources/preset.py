@@ -28,14 +28,18 @@ def fetch(config: dict) -> list[dict]:
     assets = []
 
     try:
+        user_emails = _fetch_user_emails(workspace_url, headers)
         dashboards = _paginate(f"{workspace_url}/api/v1/dashboard/", headers)
         for d in dashboards:
             owners = d.get("owners", [])
             if owners:
                 o = owners[0]
-                first = o.get("first_name", "")
-                last = o.get("last_name", "")
-                owner_name = f"{first} {last}".strip() if (first or last) else None
+                # Prefer email (from user lookup); fall back to "First Last" string
+                owner_name = user_emails.get(o.get("id"))
+                if not owner_name:
+                    first = o.get("first_name", "")
+                    last = o.get("last_name", "")
+                    owner_name = f"{first} {last}".strip() if (first or last) else None
             else:
                 owner_name = None
 
@@ -57,6 +61,22 @@ def fetch(config: dict) -> list[dict]:
         logger.error("Preset dashboards fetch failed: %s", e)
 
     return assets
+
+
+def _fetch_user_emails(workspace_url: str, headers: dict) -> dict:
+    """Return {user_id: email} for all Preset workspace users."""
+    result = {}
+    try:
+        users = _paginate(f"{workspace_url}/api/v1/security/users/", headers)
+        for u in users:
+            uid = u.get("id")
+            email = u.get("username") or u.get("email")
+            if uid and email and "@" in email:
+                result[uid] = email
+        logger.info("Preset: resolved %d user emails", len(result))
+    except Exception as e:
+        logger.warning("Preset user email fetch failed (will use name fallback): %s", e)
+    return result
 
 
 def _login(api_key: str, api_secret: str) -> str:

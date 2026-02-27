@@ -309,7 +309,7 @@ def load_config() -> dict:
 def load_metadata() -> dict:
     path = Path(__file__).parent / "metadata.yml"
     if not path.exists():
-        return {"featured": [], "name_to_domains": {}, "name_to_tags": {}}
+        return {"featured": [], "name_to_domains": {}, "name_to_tags": {}, "name_to_pods": {}, "name_to_status": {}}
     with path.open() as f:
         raw = yaml.safe_load(f) or {}
     featured = [n.lower() for n in raw.get("featured", [])]
@@ -321,13 +321,29 @@ def load_metadata() -> dict:
     for tag, names in (raw.get("tags") or {}).items():
         for name in (names or []):
             name_to_tags.setdefault(name.lower(), []).append(tag)
-    return {"featured": featured, "name_to_domains": name_to_domains, "name_to_tags": name_to_tags}
+    name_to_pods = {}
+    for pod_slug, names in (raw.get("teams") or {}).items():
+        for name in (names or []):
+            name_to_pods.setdefault(name.lower(), []).append(pod_slug)
+    name_to_status = {}
+    for status, names in (raw.get("status_override") or {}).items():
+        for name in (names or []):
+            name_to_status[name.lower()] = status
+    return {
+        "featured": featured,
+        "name_to_domains": name_to_domains,
+        "name_to_tags": name_to_tags,
+        "name_to_pods": name_to_pods,
+        "name_to_status": name_to_status,
+    }
 
 
 def enrich_assets(assets: list[dict], metadata: dict) -> None:
     featured_names = metadata["featured"]
     name_to_domains = metadata["name_to_domains"]
     name_to_tags = metadata["name_to_tags"]
+    name_to_pods = metadata["name_to_pods"]
+    name_to_status = metadata["name_to_status"]
     for asset in assets:
         name_lower = asset["name"].lower()
         asset["featured"] = any(f in name_lower for f in featured_names)
@@ -343,8 +359,17 @@ def enrich_assets(assets: list[dict], metadata: dict) -> None:
             or (owner if "@" not in owner else None)  # "First Last" string (Preset)
             or (owner.split("@")[0] if owner else None)  # email prefix fallback
         )
-        # Pod assignment
-        asset["pod_slugs"] = _OWNER_TO_POD_SLUGS.get(owner, ["non-dsa"] if owner else [])
+        # Pod assignment: metadata.yml override takes precedence, else owner-based
+        if name_lower in name_to_pods:
+            asset["pod_slugs"] = name_to_pods[name_lower]
+        else:
+            asset["pod_slugs"] = _OWNER_TO_POD_SLUGS.get(owner, ["non-dsa"] if owner else [])
+        # Status / visibility override from metadata.yml
+        status_override = name_to_status.get(name_lower)
+        if status_override == "hidden":
+            asset["quality"] = False
+        elif status_override in ("active", "stale", "unknown"):
+            asset["status"] = status_override
 
 
 def link_glossary(terms: list[dict], assets: list[dict]) -> None:

@@ -3,6 +3,7 @@
 import logging
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 
 import requests
@@ -24,20 +25,20 @@ def fetch(config: dict) -> list[dict]:
 
     try:
         dashboards = _list_dashboards(host, headers)
-        for d in dashboards:
+        # Fetch individual details in parallel to get path/owner
+        details = _fetch_details(host, headers, dashboards)
+        for d in details:
             if d.get("lifecycle_state") == "TRASHED":
                 continue
 
             dashboard_id = d.get("dashboard_id", "")
             url = f"{host}/sql/dashboardsv3/{dashboard_id}" if dashboard_id else ""
 
-            # Prefer update_time, fall back to create_time
             updated_at = _parse_dt(d.get("update_time")) or _parse_dt(d.get("create_time"))
 
-            # Owner not a top-level field — extract email from workspace path
-            # e.g. /Users/email@tubi.tv/DashboardName → email@tubi.tv
+            # Extract email from workspace path: /Users/email@tubi.tv/DashboardName
             path = d.get("path", "")
-            owner_match = re.search(r"/Users/([^/]+@[^/]+)/", path)
+            owner_match = re.search(r"/Users/([^/]+@[^/]+)/", path) if path else None
             owner = owner_match.group(1) if owner_match else (d.get("owner") or None)
 
             assets.append({
@@ -53,6 +54,36 @@ def fetch(config: dict) -> list[dict]:
         logger.error("Databricks dashboards fetch failed: %s", e)
 
     return assets
+
+
+def _fetch_details(host: str, headers: dict, dashboards: list[dict]) -> list[dict]:
+    """Fetch individual dashboard details to obtain the workspace path (owner)."""
+    def fetch_one(d: dict) -> dict:
+        did = d.get("dashboard_id", "")
+        if not did:
+            return d
+        try:
+            url = f"{host}/api/2.0/lakeview/dashboards/{did}"
+            resp = requests.get(url, headers=headers, timeout=15)
+            if resp.status_code == 429:
+                time.sleep(int(resp.headers.get("Retry-After", 5)))
+                resp = requests.get(url, headers=headers, timeout=15)
+            if resp.status_code == 200:
+                detail = resp.json()
+                if detail.get("path"):
+                    merged = dict(d)
+                    merged["path"] = detail["path"]
+                    return merged
+        except Exception:
+            pass
+        return d
+
+    results = []
+    with ThreadPoolExecutor(max_workers=15) as executor:
+        futures = {executor.submit(fetch_one, d): d for d in dashboards}
+        for future in as_completed(futures):
+            results.append(future.result())
+    return results
 
 
 def _list_dashboards(host: str, headers: dict) -> list[dict]:

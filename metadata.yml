@@ -17,3 +17,19 @@ domains:
   Content: []
 
 tags: {}
+
+# Override pod/team assignment by dashboard name (pod slug keys).
+# Use the export button in the catalog to generate these entries.
+teams: {}
+  # viewer-growth:
+  #   - "Dashboard Name"
+  # ads:
+  #   - "Dashboard Name"
+
+# Override computed status (active/stale) or hide a dashboard entirely.
+# hidden → removed from catalog; active/stale → forces that status label.
+status_override: {}
+  # hidden:
+  #   - "Dashboard to remove"
+  # active:
+  #   - "Stale dashboard that is still maintained"
