@@ -190,7 +190,7 @@
       <button class="btn btn-sm filter-btn" style="border-color:#7c3aed;color:#7c3aed;" data-tool="preset">Preset</button>
       <button class="btn btn-sm btn-outline-warning filter-btn" data-tool="databricks">Databricks</button>
     </div>
-    <button id="stale-toggle" class="btn btn-sm btn-outline-warning">Stale only</button>
+    <button id="active-toggle" class="btn btn-sm btn-outline-warning">Active only</button>
     <button id="quality-toggle" class="btn btn-sm btn-success">&#10003; Recommended only</button>
   </div>
 
@@ -436,7 +436,7 @@
 <script>
 (function () {
   var searchEl = document.getElementById('search');
-  var staleBtn = document.getElementById('stale-toggle');
+  var activeBtn = document.getElementById('active-toggle');
   var qualityBtn = document.getElementById('quality-toggle');
   var filterBtns = document.querySelectorAll('.filter-btn');
   var domainBtns = document.querySelectorAll('.domain-btn');
@@ -449,7 +449,7 @@
   var activeTool = 'all';
   var activeDomain = 'all';
   var activeTag = '';
-  var staleOnly = false;
+  var activeOnly = false;
   var qualityOnly = true;
 
   function applyFilters() {
@@ -458,7 +458,7 @@
 
     cards.forEach(function (card) {
       var matchTool = activeTool === 'all' || card.dataset.tool === activeTool;
-      var matchStale = !staleOnly || card.dataset.status === 'stale';
+      var matchActive = !activeOnly || card.dataset.status === 'active';
       var matchSearch = !query
         || card.dataset.name.indexOf(query) !== -1
         || card.dataset.tags.indexOf(query) !== -1;
@@ -468,7 +468,7 @@
         || (card.dataset.tags && card.dataset.tags.split(',').indexOf(activeTag) !== -1);
       var matchQuality = !qualityOnly || card.dataset.quality === 'true';
 
-      if (matchTool && matchStale && matchSearch && matchDomain && matchTag && matchQuality) {
+      if (matchTool && matchActive && matchSearch && matchDomain && matchTag && matchQuality) {
         card.classList.remove('hidden');
         visible++;
       } else {
@@ -527,11 +527,11 @@
     applyFilters();
   });
 
-  // Stale toggle
-  staleBtn.addEventListener('click', function () {
-    staleOnly = !staleOnly;
-    staleBtn.classList.toggle('btn-warning', staleOnly);
-    staleBtn.classList.toggle('btn-outline-warning', !staleOnly);
+  // Active only toggle
+  activeBtn.addEventListener('click', function () {
+    activeOnly = !activeOnly;
+    activeBtn.classList.toggle('btn-warning', activeOnly);
+    activeBtn.classList.toggle('btn-outline-warning', !activeOnly);
     applyFilters();
   });
 
@@ -551,6 +551,9 @@
   if (glossarySearchEl) {
     glossarySearchEl.addEventListener('input', applyGlossaryFilter);
   }
+
+  // Apply filters on initial page load
+  applyFilters();
 })();
 
 function jumpToDashboard(name) {
