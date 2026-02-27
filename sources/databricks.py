@@ -24,10 +24,6 @@ def fetch(config: dict) -> list[dict]:
 
     try:
         dashboards = _list_dashboards(host, headers)
-        if dashboards:
-            sample = dashboards[0]
-            logger.info("Databricks sample keys: %s", list(sample.keys()))
-            logger.info("Databricks sample path: %s", sample.get("path"))
         for d in dashboards:
             if d.get("lifecycle_state") == "TRASHED":
                 continue

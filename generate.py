@@ -143,6 +143,126 @@ def _infer_domains(asset: dict) -> list[str]:
     return domains
 
 
+# ── Owner / pod mapping ───────────────────────────────────────────────────────
+
+DSA_PODS = [
+    "Viewer Growth",
+    "Core Experiences",
+    "Ads",
+    "Content",
+    "DiscoAI",
+    "Experimentation",
+    "Finance & BizOps",
+    "Infra/Tools",
+]
+
+_POD_SLUG = {
+    "Viewer Growth":    "viewer-growth",
+    "Core Experiences": "core-experiences",
+    "Ads":              "ads",
+    "Content":          "content",
+    "DiscoAI":          "discoai",
+    "Experimentation":  "experimentation",
+    "Finance & BizOps": "finance-bizops",
+    "Infra/Tools":      "infra-tools",
+}
+
+# Canonical display name for every known owner identifier (email or "First Last")
+_OWNER_DISPLAY = {
+    # Tableau owners (email → display name)
+    "agutierrez@tubi.tv":                               "A. Gutierrez",
+    "akshatshah@tubi.tv":                               "Akshat Shah",
+    "aray@tubi.tv":                                     "Ashley Ray",
+    "bderegt@tubi.tv":                                  "Bryan deRegt",
+    "bmccue@tubi.tv":                                   "Bryan McCue",
+    "elau@tubi.tv":                                     "Elvis Lau",
+    "esthertsui@tubi.tv":                               "Esther Tsui",
+    "gbroe@tubi.tv":                                    "Greg Broe",
+    "jfan@tubi.tv":                                     "J. Fan",
+    "jvora@tubi.tv":                                    "Jaynil Vora",
+    "knguyen@tubi.tv":                                  "K. Nguyen",
+    "stephenkim@tubi.tv":                               "Stephen Kim",
+    "tdecampo@tubi.tv":                                 "Tim DeCampo",
+    "tol.admin.api.broker.service.usera@tableau.com":   "Tableau Service",
+    "vhernandez@tubi.tv":                               "V. Hernandez",
+    "wgao@tubi.tv":                                     "Wenting Gao",
+    "xchen@tubi.tv":                                    "Xueling Chen",
+    "ychen@tubi.tv":                                    "Yixin Chen",
+    # DSA members not yet seen in Tableau (for future dashboards / Preset matching)
+    "ajain@tubi.tv":        "Aashi Jain",
+    "amirina@tubi.tv":      "Alex Mirina",
+    "bpulikkal@tubi.tv":    "Binoop Pulikkal",
+    "cbejjani@tubi.tv":     "Christina Bejjani",
+    "cdileo@tubi.tv":       "Christopher DiLeo",
+    "gcavdar@tubi.tv":      "Gozde Cavdar",
+    "gnguyen@tubi.tv":      "GiGi Nguyen",
+    "hmahoney@tubi.tv":     "Hillary Mahoney",
+    "jdeng@tubi.tv":        "Jieyi Deng",
+    "jsingh@tubi.tv":       "Jaskaran Singh",
+    "lmantena@tubi.tv":     "Lakshmi Mantena",
+    "lwiebolt@tubi.tv":     "Luke Wiebolt",
+    "mdorofiyenko@tubi.tv": "Maxim Dorofiyenko",
+    "myoung@tubi.tv":       "Mariel Young",
+    "rvaswani@tubi.tv":     "Rahul Vaswani",
+    "slu@tubi.tv":          "Sang Lu",
+    "syin@tubi.tv":         "Sunny Yin",
+    "vlu@tubi.tv":          "Vivian Lu",
+    "ywang@tubi.tv":        "Yixin Wang",
+    "yliu@tubi.tv":         "Yonglin Liu",
+}
+
+# DSA pod membership: pod name → list of owner identifiers (email or "First Last")
+_DSA_POD_MEMBERS: dict[str, list[str]] = {
+    "Viewer Growth": [
+        "bderegt@tubi.tv", "gnguyen@tubi.tv", "gbroe@tubi.tv",
+        "hmahoney@tubi.tv", "slu@tubi.tv",
+        # Preset name variants
+        "Greg Broe", "GiGi Nguyen", "Hillary Mahoney", "Sang Lu",
+    ],
+    "Infra/Tools": [
+        "bderegt@tubi.tv", "lwiebolt@tubi.tv",
+        "Luke Wiebolt",
+    ],
+    "Finance & BizOps": [
+        "stephenkim@tubi.tv", "aray@tubi.tv", "bderegt@tubi.tv",
+        "Stephen Kim", "Ashley Ray",
+    ],
+    "Experimentation": [
+        "wgao@tubi.tv", "aray@tubi.tv",
+        "Wenting Gao", "Ashley Ray",
+    ],
+    "Content": [
+        "rvaswani@tubi.tv", "aray@tubi.tv", "cbejjani@tubi.tv",
+        "elau@tubi.tv", "lmantena@tubi.tv", "tdecampo@tubi.tv",
+        "Rahul Vaswani", "Ashley Ray", "Christina Bejjani",
+        "Elvis Lau", "Lakshmi Mantena", "Tim DeCampo",
+    ],
+    "DiscoAI": [
+        "ajain@tubi.tv", "amirina@tubi.tv", "jsingh@tubi.tv", "ychen@tubi.tv",
+        "Aashi Jain", "Alex Mirina", "Jaskaran Singh", "Yixin Chen",
+    ],
+    "Core Experiences": [
+        "cdileo@tubi.tv", "gcavdar@tubi.tv", "jdeng@tubi.tv",
+        "myoung@tubi.tv", "syin@tubi.tv", "yliu@tubi.tv",
+        "Christopher DiLeo", "Gozde Cavdar", "Jieyi Deng",
+        "Mariel Young", "Sunny Yin", "Yonglin Liu",
+    ],
+    "Ads": [
+        "akshatshah@tubi.tv", "bpulikkal@tubi.tv", "jvora@tubi.tv",
+        "vlu@tubi.tv", "ywang@tubi.tv", "mdorofiyenko@tubi.tv",
+        "Akshat Shah", "Binoop Pulikkal", "Jaynil Vora",
+        "Vivian Lu", "Yixin Wang", "Maxim Dorofiyenko",
+    ],
+}
+
+# Build reverse lookup: owner identifier → [pod_slug, ...]
+_OWNER_TO_POD_SLUGS: dict[str, list[str]] = {}
+for _pod, _members in _DSA_POD_MEMBERS.items():
+    for _identifier in _members:
+        _OWNER_TO_POD_SLUGS.setdefault(_identifier, []).append(_POD_SLUG[_pod])
+
+# ── Quality filtering ─────────────────────────────────────────────────────────
+
 _BAD_NAME_PREFIXES = ("untitled", "copy of ", "[test]", "[draft]")
 _BAD_NAME_EXACT = {"test", "draft", "temp", "untitled", "untitled dashboard"}
 _BAD_NAME_SUBSTRINGS = ("\btmp\b",)
@@ -216,6 +336,15 @@ def enrich_assets(assets: list[dict], metadata: dict) -> None:
         asset["tags"] = name_to_tags.get(name_lower, [])
         asset["related_terms"] = []
         asset["quality"] = compute_quality(asset)
+        # Owner display name
+        owner = asset.get("owner") or ""
+        asset["owner_display"] = (
+            _OWNER_DISPLAY.get(owner)           # email → display name (Tableau)
+            or (owner if "@" not in owner else None)  # "First Last" string (Preset)
+            or (owner.split("@")[0] if owner else None)  # email prefix fallback
+        )
+        # Pod assignment
+        asset["pod_slugs"] = _OWNER_TO_POD_SLUGS.get(owner, ["non-dsa"] if owner else [])
 
 
 def link_glossary(terms: list[dict], assets: list[dict]) -> None:
@@ -287,7 +416,9 @@ def main() -> None:
     html = template.render(
         assets=all_assets,
         glossary_terms=glossary_terms,
-        all_domains=all_domains,
+        canonical_domains=all_domains,
+        dsa_pods=DSA_PODS,
+        pod_slug=_POD_SLUG,
         generated_at=generated_at,
         errors=errors,
         counts={

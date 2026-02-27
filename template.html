@@ -11,464 +11,538 @@
     crossorigin="anonymous"
   />
   <style>
-    body { background: #f8f9fa; }
+    /* ── Layout ───────────────────────────────────────────────────── */
+    html, body { height: 100%; margin: 0; background: #f3f4f6; }
+
     .catalog-header {
       background: #1a1a2e;
       color: #fff;
-      padding: 1.25rem 0;
+      padding: 1rem 1.5rem;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 6px rgba(0,0,0,.25);
     }
-    .catalog-header h1 { font-size: 1.5rem; font-weight: 700; margin: 0; }
-    .catalog-header .refresh-ts { font-size: 0.8rem; color: #adb5bd; margin-top: 0.15rem; }
+    .catalog-header h1 { font-size: 1.3rem; font-weight: 700; margin: 0; }
+    .catalog-header .refresh-ts { font-size: 0.75rem; color: #adb5bd; }
 
-    /* Tool badge colors */
+    .catalog-body {
+      display: flex;
+      align-items: flex-start;
+      min-height: calc(100vh - 64px);
+    }
+
+    /* ── Sidebar ──────────────────────────────────────────────────── */
+    .sidebar {
+      width: 220px;
+      min-width: 220px;
+      background: #fff;
+      border-right: 1px solid #e5e7eb;
+      padding: 1.1rem 1rem 2rem;
+      position: sticky;
+      top: 64px;
+      height: calc(100vh - 64px);
+      overflow-y: auto;
+    }
+
+    .sidebar-section-title {
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #9ca3af;
+      margin: 1.1rem 0 0.35rem;
+      padding-top: 0.75rem;
+      border-top: 1px solid #f3f4f6;
+    }
+    .sidebar-section-title:first-of-type { border-top: none; margin-top: 0.5rem; }
+
+    .filter-item {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.28rem 0.5rem;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 0.82rem;
+      color: #374151;
+      user-select: none;
+      transition: background 0.1s;
+    }
+    .filter-item:hover { background: #f3f4f6; }
+    .filter-item.active { background: #eff6ff; color: #1d4ed8; font-weight: 600; }
+    .filter-item .dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      border: 2px solid #d1d5db;
+      flex-shrink: 0;
+      transition: background 0.1s, border-color 0.1s;
+    }
+    .filter-item.active .dot { background: #1d4ed8; border-color: #1d4ed8; }
+
+    .sidebar-toggle {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.28rem 0.5rem;
+      font-size: 0.82rem;
+      color: #374151;
+      cursor: pointer;
+    }
+    .sidebar-toggle input[type=checkbox] { cursor: pointer; }
+
+    #clear-filters {
+      font-size: 0.75rem;
+      color: #ef4444;
+      text-decoration: none;
+      display: none;
+      padding: 0.2rem 0.5rem;
+    }
+    #clear-filters:hover { text-decoration: underline; }
+
+    /* ── Main content ─────────────────────────────────────────────── */
+    .main-content {
+      flex: 1;
+      min-width: 0;
+      padding: 1.25rem 1.5rem 3rem;
+    }
+
+    /* ── Active filter chips ──────────────────────────────────────── */
+    .filter-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      background: #dbeafe;
+      color: #1e40af;
+      font-size: 0.75rem;
+      font-weight: 500;
+      padding: 0.2rem 0.55rem;
+      border-radius: 999px;
+      cursor: pointer;
+    }
+    .filter-chip:hover { background: #bfdbfe; }
+
+    /* ── Count badges ─────────────────────────────────────────────── */
+    .count-badge {
+      font-size: 0.82rem;
+      padding: 0.3rem 0.85rem;
+      border-radius: 999px;
+      font-weight: 500;
+    }
     .badge-tableau   { background: #1f77b4; color: #fff; }
     .badge-preset    { background: #7c3aed; color: #fff; }
     .badge-databricks { background: #e67e22; color: #fff; }
 
-    /* Status pills */
-    .status-active  { color: #198754; font-weight: 600; }
-    .status-stale   { color: #ffc107; font-weight: 600; }
-    .status-unknown { color: #6c757d; font-weight: 600; }
+    /* ── Status pills ─────────────────────────────────────────────── */
+    .status-active  { color: #16a34a; font-weight: 600; }
+    .status-stale   { color: #d97706; font-weight: 600; }
+    .status-unknown { color: #9ca3af; font-weight: 600; }
 
+    /* ── Asset cards ──────────────────────────────────────────────── */
     .asset-card {
       background: #fff;
-      border: 1px solid #dee2e6;
+      border: 1px solid #e5e7eb;
       border-radius: 8px;
-      padding: 1rem 1.25rem;
-      margin-bottom: 0.75rem;
+      padding: 0.875rem 1.1rem;
+      margin-bottom: 0.6rem;
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
       gap: 1rem;
+      transition: box-shadow 0.15s;
     }
+    .asset-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.08); }
     .asset-card.hidden { display: none; }
-    .asset-name { font-weight: 600; font-size: 1rem; margin-bottom: 0.2rem; }
-    .asset-meta { font-size: 0.8rem; color: #6c757d; }
+
+    .asset-name { font-weight: 600; font-size: 0.95rem; margin-bottom: 0.15rem; }
+    .asset-meta { font-size: 0.78rem; color: #6b7280; }
+    .asset-description { font-size: 0.78rem; color: #4b5563; margin-top: 0.2rem; line-height: 1.4; }
     .asset-actions { flex-shrink: 0; text-align: right; }
-    .asset-status { margin-bottom: 0.4rem; font-size: 0.85rem; }
+    .asset-status  { margin-bottom: 0.35rem; font-size: 0.82rem; }
 
-    .filter-btn.active { font-weight: 700; }
-
-    /* Asset description */
-    .asset-description {
-      font-size: 0.8rem;
-      color: #495057;
-      margin-top: 0.25rem;
-      line-height: 1.4;
+    .tool-badge {
+      display: inline-block;
+      font-size: 0.65rem;
+      font-weight: 600;
+      padding: 0.1rem 0.45rem;
+      border-radius: 999px;
+      vertical-align: middle;
+      margin-right: 0.35rem;
     }
 
+    /* ── Tag pills ────────────────────────────────────────────────── */
+    .tag-pill {
+      display: inline-block;
+      background: #f3f4f6;
+      color: #374151;
+      border-radius: 999px;
+      padding: 0.1rem 0.5rem;
+      font-size: 0.7rem;
+      cursor: pointer;
+      margin-right: 0.2rem;
+      margin-top: 0.2rem;
+      border: 1px solid transparent;
+    }
+    .tag-pill:hover { background: #e5e7eb; }
+    .tag-pill.active { background: #1d4ed8; color: #fff; }
+
+    /* ── Related terms ────────────────────────────────────────────── */
+    .related-terms { font-size: 0.75rem; color: #6b7280; margin-top: 0.2rem; }
+    .related-terms a { color: #2563eb; text-decoration: none; }
+    .related-terms a:hover { text-decoration: underline; }
+
+    /* ── Featured section ─────────────────────────────────────────── */
+    .featured-section {
+      border-left: 4px solid #f59e0b;
+      background: #fffbeb;
+      border-radius: 0 8px 8px 0;
+      padding: 0.75rem 0.875rem 0.25rem;
+      margin-bottom: 1rem;
+    }
+    .featured-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: #92400e;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 0.5rem;
+    }
+
+    /* ── No results ───────────────────────────────────────────────── */
     #no-results {
       text-align: center;
-      color: #6c757d;
+      color: #9ca3af;
       padding: 3rem 0;
       display: none;
     }
 
-    .counts-row .count-badge {
-      font-size: 1rem;
-      padding: 0.5rem 1.25rem;
-      border-radius: 20px;
-    }
-
-    /* Featured section */
-    .featured-section {
-      border-left: 4px solid #f0c040;
-      background: #fffbea;
-      border-radius: 0 8px 8px 0;
-      padding: 0.75rem 1rem 0.25rem;
-      margin-bottom: 1rem;
-    }
-    .featured-label {
-      font-size: 0.75rem;
-      font-weight: 700;
-      color: #b8860b;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      margin-bottom: 0.5rem;
-    }
-    .featured-section .asset-card {
-      border-left: none;
-    }
-
-    /* Tag pills */
-    .tag-pill {
-      display: inline-block;
-      background: #e9ecef;
-      color: #495057;
-      border-radius: 12px;
-      padding: 0.1rem 0.55rem;
-      font-size: 0.72rem;
-      cursor: pointer;
-      margin-right: 0.25rem;
-      margin-top: 0.25rem;
-      border: 1px solid transparent;
-    }
-    .tag-pill:hover { background: #dee2e6; }
-    .tag-pill.active { background: #0d6efd; color: #fff; border-color: #0d6efd; }
-
-    /* Related terms */
-    .related-terms { font-size: 0.78rem; color: #6c757d; margin-top: 0.25rem; }
-    .related-terms a { color: #0d6efd; text-decoration: none; }
-    .related-terms a:hover { text-decoration: underline; }
-
-    /* Glossary section */
+    /* ── Glossary section ─────────────────────────────────────────── */
     #glossary-section { margin-top: 2.5rem; }
-    #glossary-section h2 { font-size: 1.3rem; font-weight: 700; margin-bottom: 1rem; }
-    #glossary-section h3 { font-size: 1.05rem; font-weight: 600; margin: 1.5rem 0 0.75rem; color: #1a1a2e; }
+    #glossary-section h2 { font-size: 1.2rem; font-weight: 700; }
+    #glossary-section h3 { font-size: 1rem; font-weight: 600; margin: 1.25rem 0 0.6rem; color: #1a1a2e; }
 
     .glossary-card {
       background: #fff;
-      border: 1px solid #dee2e6;
+      border: 1px solid #e5e7eb;
       border-radius: 8px;
-      padding: 0.85rem 1.1rem;
-      margin-bottom: 0.6rem;
+      padding: 0.8rem 1rem;
+      margin-bottom: 0.5rem;
     }
     .glossary-card.hidden { display: none; }
-    .glossary-term-name { font-weight: 600; font-size: 0.95rem; }
-    .glossary-definition { font-size: 0.85rem; color: #495057; margin-top: 0.2rem; }
+    .glossary-term-name { font-weight: 600; font-size: 0.9rem; }
+    .glossary-definition { font-size: 0.82rem; color: #4b5563; margin-top: 0.15rem; }
     .glossary-formula {
-      font-size: 0.8rem;
-      color: #6c757d;
-      font-family: monospace;
-      background: #f8f9fa;
-      padding: 0.2rem 0.4rem;
-      border-radius: 4px;
-      margin-top: 0.3rem;
-      display: inline-block;
+      font-size: 0.78rem; color: #6b7280; font-family: monospace;
+      background: #f9fafb; padding: 0.15rem 0.4rem; border-radius: 4px;
+      margin-top: 0.25rem; display: inline-block;
     }
-    .glossary-dashboards { font-size: 0.78rem; color: #6c757d; margin-top: 0.3rem; }
-    .glossary-dashboards a { color: #0d6efd; text-decoration: none; cursor: pointer; }
+    .glossary-dashboards { font-size: 0.75rem; color: #6b7280; margin-top: 0.25rem; }
+    .glossary-dashboards a { color: #2563eb; cursor: pointer; text-decoration: none; }
     .glossary-dashboards a:hover { text-decoration: underline; }
 
     .badge-category {
-      font-size: 0.68rem;
-      padding: 0.15rem 0.5rem;
-      border-radius: 10px;
-      background: #e9ecef;
-      color: #495057;
-      font-weight: 600;
-      margin-left: 0.4rem;
-      vertical-align: middle;
+      font-size: 0.65rem; padding: 0.1rem 0.45rem; border-radius: 999px;
+      background: #f3f4f6; color: #374151; font-weight: 600;
+      margin-left: 0.35rem; vertical-align: middle;
     }
-    .badge-metric { background: #d1ecf1; color: #0c5460; }
-    .badge-glossary { background: #d4edda; color: #155724; }
+    .badge-metric  { background: #cffafe; color: #0e7490; }
+    .badge-glossary { background: #dcfce7; color: #15803d; }
 
-    #glossary-search-container { max-width: 320px; }
+    /* ── Mobile sidebar toggle ────────────────────────────────────── */
+    #sidebar-toggle { display: none; }
+    @media (max-width: 768px) {
+      #sidebar-toggle { display: inline-flex; }
+      .sidebar {
+        position: fixed; top: 0; left: -240px; height: 100vh; z-index: 200;
+        transition: left 0.25s; width: 240px; padding-top: 3.5rem;
+        box-shadow: none;
+      }
+      .sidebar.open { left: 0; box-shadow: 4px 0 20px rgba(0,0,0,.15); }
+      .main-content { padding: 1rem; }
+    }
   </style>
 </head>
 <body>
 
 <!-- Header -->
-<div class="catalog-header">
-  <div class="container">
-    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-      <div>
-        <h1>Tubi Data Catalog</h1>
-        <div class="refresh-ts">
-          Last refreshed: {{ generated_at.strftime('%b %-d, %Y %H:%M UTC') }}
+<header class="catalog-header">
+  <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap">
+    <div>
+      <h1>Tubi Data Catalog</h1>
+      <div class="refresh-ts">Last refreshed: {{ generated_at.strftime('%b %-d, %Y %H:%M UTC') }}</div>
+    </div>
+    <div class="d-flex align-items-center gap-2" style="max-width:380px;flex:1;">
+      <button id="sidebar-toggle" class="btn btn-sm btn-outline-light px-2 py-1">☰</button>
+      <input
+        id="search"
+        type="search"
+        class="form-control form-control-sm"
+        placeholder="Search dashboards…"
+        autocomplete="off"
+        style="background:#2d2d4a;border-color:#4a4a6a;color:#fff;"
+      />
+    </div>
+    <a href="#glossary-section" class="btn btn-sm btn-outline-light text-nowrap">Glossary ↓</a>
+  </div>
+</header>
+
+<!-- Body -->
+<div class="catalog-body">
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+
+    <a id="clear-filters" href="#">✕ Clear filters</a>
+
+    <!-- Source -->
+    <div class="sidebar-section-title">Source</div>
+    <div class="filter-item active" data-filter="tool" data-value="all">
+      <span class="dot"></span> All Sources
+    </div>
+    <div class="filter-item" data-filter="tool" data-value="tableau">
+      <span class="dot"></span> Tableau
+    </div>
+    <div class="filter-item" data-filter="tool" data-value="preset">
+      <span class="dot"></span> Preset
+    </div>
+    <div class="filter-item" data-filter="tool" data-value="databricks">
+      <span class="dot"></span> Databricks
+    </div>
+
+    <!-- Domain -->
+    <div class="sidebar-section-title">Domain</div>
+    <div class="filter-item active" data-filter="domain" data-value="all">
+      <span class="dot"></span> All Domains
+    </div>
+    {% for domain in canonical_domains %}
+    <div class="filter-item" data-filter="domain" data-value="{{ domain | lower }}">
+      <span class="dot"></span> {{ domain }}
+    </div>
+    {% endfor %}
+
+    <!-- Team -->
+    <div class="sidebar-section-title">Team</div>
+    <div class="filter-item active" data-filter="pod" data-value="all">
+      <span class="dot"></span> All Teams
+    </div>
+    {% for pod in dsa_pods %}
+    <div class="filter-item" data-filter="pod" data-value="{{ pod_slug[pod] }}">
+      <span class="dot"></span> {{ pod }}
+    </div>
+    {% endfor %}
+    <div class="filter-item" data-filter="pod" data-value="non-dsa">
+      <span class="dot"></span> Non-DSA
+    </div>
+
+    <!-- Options -->
+    <div class="sidebar-section-title">Options</div>
+    <label class="sidebar-toggle">
+      <input type="checkbox" id="quality-check" checked />
+      Recommended only
+    </label>
+    <label class="sidebar-toggle">
+      <input type="checkbox" id="active-check" />
+      Active only
+    </label>
+
+  </aside>
+
+  <!-- Main content -->
+  <main class="main-content">
+
+    <!-- Count bar -->
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+      <span class="count-badge bg-secondary text-white">
+        <span id="count-visible">{{ counts.total }}</span> / {{ counts.total }} dashboards
+      </span>
+      <span class="count-badge badge-tableau">{{ counts.tableau }} Tableau</span>
+      <span class="count-badge badge-preset">{{ counts.preset }} Preset</span>
+      <span class="count-badge badge-databricks">{{ counts.databricks }} Databricks</span>
+    </div>
+
+    <!-- Active filter chips -->
+    <div id="active-chips" class="d-flex flex-wrap gap-1 mb-3"></div>
+
+    {% if errors %}
+    <div class="alert alert-warning py-2 mb-3" role="alert">
+      <strong>Fetch warnings:</strong> {{ errors | join('; ') }}
+    </div>
+    {% endif %}
+
+    <!-- Featured section -->
+    {% set featured_assets = assets | selectattr('featured') | list %}
+    {% if featured_assets %}
+    <div class="featured-section">
+      <div class="featured-label">&#9733; Featured</div>
+      {% for asset in featured_assets %}
+      <div
+        class="asset-card"
+        data-tool="{{ asset.tool }}"
+        data-status="{{ asset.status }}"
+        data-name="{{ asset.name | lower }}"
+        data-domains="{{ asset.domains | join(',') | lower }}"
+        data-pods="{{ asset.pod_slugs | join(',') }}"
+        data-tags="{{ asset.tags | join(',') | lower }}"
+        data-featured="true"
+        data-quality="{{ 'true' if asset.quality else 'false' }}"
+      >
+        <div>
+          <div class="asset-name">
+            <span class="tool-badge badge-{{ asset.tool }}">{{ asset.tool | capitalize }}</span>
+            {{ asset.name }}
+          </div>
+          <div class="asset-meta">
+            {% if asset.owner_display %}{{ asset.owner_display }} &nbsp;·&nbsp; {% endif %}
+            {% if asset.updated_at %}Updated {{ asset.updated_at.strftime('%b %-d, %Y') }}{% else %}Updated: unknown{% endif %}
+          </div>
+          {% if asset.description %}<div class="asset-description">{{ asset.description | truncate(150) }}</div>{% endif %}
+          {% if asset.tags %}<div class="mt-1">{% for tag in asset.tags %}<span class="tag-pill" data-tag="{{ tag | lower }}">{{ tag }}</span>{% endfor %}</div>{% endif %}
+          {% if asset.related_terms %}<div class="related-terms">Related: {% for term in asset.related_terms %}<a href="#glossary-section" onclick="highlightTerm('{{ term | lower }}')">{{ term }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</div>{% endif %}
+        </div>
+        <div class="asset-actions">
+          <div class="asset-status">
+            {% if asset.status == 'active' %}<span class="status-active">● Active</span>
+            {% elif asset.status == 'stale' %}<span class="status-stale">▲ Stale</span>
+            {% else %}<span class="status-unknown">● Unknown</span>{% endif %}
+          </div>
+          {% if asset.url %}<a href="{{ asset.url }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary">Open →</a>{% endif %}
         </div>
       </div>
-      <div class="w-100 w-md-auto" style="max-width:320px;">
-        <input
-          id="search"
-          type="search"
-          class="form-control"
-          placeholder="Search dashboards…"
-          autocomplete="off"
-        />
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Filters + counts -->
-<div class="container mt-3">
-  <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
-    <div class="btn-group" role="group" aria-label="Tool filter">
-      <button class="btn btn-sm btn-outline-secondary filter-btn active" data-tool="all">All</button>
-      <button class="btn btn-sm btn-outline-primary filter-btn" data-tool="tableau">Tableau</button>
-      <button class="btn btn-sm filter-btn" style="border-color:#7c3aed;color:#7c3aed;" data-tool="preset">Preset</button>
-      <button class="btn btn-sm btn-outline-warning filter-btn" data-tool="databricks">Databricks</button>
-    </div>
-    <button id="active-toggle" class="btn btn-sm btn-outline-warning">Active only</button>
-    <button id="quality-toggle" class="btn btn-sm btn-success">&#10003; Recommended only</button>
-  </div>
-
-  <!-- Domain filter row -->
-  {% if all_domains %}
-  <div class="d-flex align-items-center flex-wrap gap-1 mb-2">
-    <div class="btn-group flex-wrap" role="group" aria-label="Domain filter">
-      <button class="btn btn-sm btn-outline-secondary domain-btn active" data-domain="all">All Domains</button>
-      {% for domain in all_domains %}
-      <button class="btn btn-sm btn-outline-secondary domain-btn" data-domain="{{ domain | lower }}">{{ domain }}</button>
       {% endfor %}
     </div>
-  </div>
-  {% endif %}
-
-  <!-- Count summary -->
-  <div class="counts-row d-flex flex-wrap gap-2 mb-3">
-    <span class="count-badge bg-secondary text-white">
-      <span id="count-visible">{{ counts.total }}</span> / {{ counts.total }} Total
-    </span>
-    <span class="count-badge badge-tableau rounded-pill px-3 py-2">{{ counts.tableau }} Tableau</span>
-    <span class="count-badge badge-preset rounded-pill px-3 py-2">{{ counts.preset }} Preset</span>
-    <span class="count-badge badge-databricks rounded-pill px-3 py-2">{{ counts.databricks }} Databricks</span>
-  </div>
-
-  {% if errors %}
-  <div class="alert alert-warning py-2" role="alert">
-    <strong>Fetch warnings:</strong> {{ errors | join('; ') }}
-  </div>
-  {% endif %}
-
-  <!-- Featured section -->
-  {% set featured_assets = assets | selectattr('featured') | list %}
-  {% if featured_assets %}
-  <div class="featured-section">
-    <div class="featured-label">&#9733; Featured</div>
-    {% for asset in featured_assets %}
-    <div
-      class="asset-card"
-      data-tool="{{ asset.tool }}"
-      data-status="{{ asset.status }}"
-      data-name="{{ asset.name | lower }}"
-      data-domains="{{ asset.domains | join(',') | lower }}"
-      data-tags="{{ asset.tags | join(',') | lower }}"
-      data-featured="true"
-      data-quality="{{ 'true' if asset.quality else 'false' }}"
-    >
-      <div>
-        <div class="asset-name">
-          <span class="badge badge-{{ asset.tool }} rounded-pill me-2" style="font-size:0.7rem;vertical-align:middle;">
-            {{ asset.tool | capitalize }}
-          </span>
-          {{ asset.name }}
-        </div>
-        <div class="asset-meta">
-          {% if asset.owner %}Owner: {{ asset.owner }} &nbsp;·&nbsp; {% endif %}
-          {% if asset.updated_at %}
-            Updated {{ asset.updated_at.strftime('%b %-d, %Y') }}
-          {% else %}
-            Updated: unknown
-          {% endif %}
-        </div>
-        {% if asset.description %}
-        <div class="asset-description">{{ asset.description | truncate(150) }}</div>
-        {% endif %}
-        {% if asset.tags %}
-        <div class="mt-1">
-          {% for tag in asset.tags %}
-          <span class="tag-pill" data-tag="{{ tag | lower }}">{{ tag }}</span>
-          {% endfor %}
-        </div>
-        {% endif %}
-        {% if asset.related_terms %}
-        <div class="related-terms">
-          Related: {% for term in asset.related_terms %}<a href="#glossary-section" onclick="highlightTerm('{{ term | lower }}')">{{ term }}</a>{% if not loop.last %}, {% endif %}{% endfor %}
-        </div>
-        {% endif %}
-      </div>
-      <div class="asset-actions">
-        <div class="asset-status">
-          {% if asset.status == 'active' %}
-            <span class="status-active">● Active</span>
-          {% elif asset.status == 'stale' %}
-            <span class="status-stale">▲ Stale</span>
-          {% else %}
-            <span class="status-unknown">● Unknown</span>
-          {% endif %}
-        </div>
-        {% if asset.url %}
-        <a href="{{ asset.url }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary">
-          Open in {{ asset.tool | capitalize }} →
-        </a>
-        {% endif %}
-      </div>
-    </div>
-    {% endfor %}
-  </div>
-  {% endif %}
-
-  <!-- Asset list -->
-  <div id="asset-list">
-    {% for asset in assets %}
-    <div
-      class="asset-card"
-      data-tool="{{ asset.tool }}"
-      data-status="{{ asset.status }}"
-      data-name="{{ asset.name | lower }}"
-      data-domains="{{ asset.domains | join(',') | lower }}"
-      data-tags="{{ asset.tags | join(',') | lower }}"
-      data-featured="{{ 'true' if asset.featured else 'false' }}"
-      data-quality="{{ 'true' if asset.quality else 'false' }}"
-    >
-      <div>
-        <div class="asset-name">
-          <span class="badge badge-{{ asset.tool }} rounded-pill me-2" style="font-size:0.7rem;vertical-align:middle;">
-            {{ asset.tool | capitalize }}
-          </span>
-          {{ asset.name }}
-        </div>
-        <div class="asset-meta">
-          {% if asset.owner %}Owner: {{ asset.owner }} &nbsp;·&nbsp; {% endif %}
-          {% if asset.updated_at %}
-            Updated {{ asset.updated_at.strftime('%b %-d, %Y') }}
-          {% else %}
-            Updated: unknown
-          {% endif %}
-        </div>
-        {% if asset.description %}
-        <div class="asset-description">{{ asset.description | truncate(150) }}</div>
-        {% endif %}
-        {% if asset.tags %}
-        <div class="mt-1">
-          {% for tag in asset.tags %}
-          <span class="tag-pill" data-tag="{{ tag | lower }}">{{ tag }}</span>
-          {% endfor %}
-        </div>
-        {% endif %}
-        {% if asset.related_terms %}
-        <div class="related-terms">
-          Related: {% for term in asset.related_terms %}<a href="#glossary-section" onclick="highlightTerm('{{ term | lower }}')">{{ term }}</a>{% if not loop.last %}, {% endif %}{% endfor %}
-        </div>
-        {% endif %}
-      </div>
-      <div class="asset-actions">
-        <div class="asset-status">
-          {% if asset.status == 'active' %}
-            <span class="status-active">● Active</span>
-          {% elif asset.status == 'stale' %}
-            <span class="status-stale">▲ Stale</span>
-          {% else %}
-            <span class="status-unknown">● Unknown</span>
-          {% endif %}
-        </div>
-        {% if asset.url %}
-        <a href="{{ asset.url }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary">
-          Open in {{ asset.tool | capitalize }} →
-        </a>
-        {% endif %}
-      </div>
-    </div>
-    {% endfor %}
-  </div>
-
-  <div id="no-results">No dashboards match your filters.</div>
-
-  <!-- Glossary section -->
-  {% if glossary_terms %}
-  <div id="glossary-section">
-    <hr class="my-4" />
-    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-      <h2 class="mb-0">Glossary &amp; Metrics</h2>
-      <div id="glossary-search-container">
-        <input
-          id="glossary-search"
-          type="search"
-          class="form-control form-control-sm"
-          placeholder="Search glossary…"
-          autocomplete="off"
-        />
-      </div>
-    </div>
-
-    {% set glossary_only = glossary_terms | selectattr('type', 'equalto', 'glossary') | list %}
-    {% set metrics_only = glossary_terms | selectattr('type', 'equalto', 'metric') | list %}
-
-    {% if glossary_only %}
-    <h3>Glossary Terms</h3>
-    {% for term in glossary_only %}
-    <div
-      class="glossary-card"
-      data-term="{{ term.term | lower }}"
-      data-category="{{ term.category | lower }}"
-      data-type="glossary"
-    >
-      <div>
-        <span class="glossary-term-name">{{ term.term }}</span>
-        <span class="badge-category badge-glossary">{{ term.category }}</span>
-      </div>
-      <div class="glossary-definition">{{ term.definition }}</div>
-      {% if term.dashboards %}
-      <div class="glossary-dashboards">
-        Dashboards: {% for name in term.dashboards %}<a onclick="jumpToDashboard('{{ name | lower }}')">{{ name }}</a>{% if not loop.last %}, {% endif %}{% endfor %}
-      </div>
-      {% endif %}
-    </div>
-    {% endfor %}
     {% endif %}
 
-    {% if metrics_only %}
-    <h3>Metrics</h3>
-    {% for term in metrics_only %}
-    <div
-      class="glossary-card"
-      data-term="{{ term.term | lower }}"
-      data-category="{{ term.category | lower }}"
-      data-type="metric"
-    >
-      <div>
-        <span class="glossary-term-name">{{ term.term }}</span>
-        <span class="badge-category badge-metric">{{ term.category }}</span>
-        {% for tag in term.tags[1:] %}
-        <span class="badge-category">{{ tag }}</span>
-        {% endfor %}
+    <!-- Asset list -->
+    <div id="asset-list">
+      {% for asset in assets %}
+      <div
+        class="asset-card"
+        data-tool="{{ asset.tool }}"
+        data-status="{{ asset.status }}"
+        data-name="{{ asset.name | lower }}"
+        data-domains="{{ asset.domains | join(',') | lower }}"
+        data-pods="{{ asset.pod_slugs | join(',') }}"
+        data-tags="{{ asset.tags | join(',') | lower }}"
+        data-featured="{{ 'true' if asset.featured else 'false' }}"
+        data-quality="{{ 'true' if asset.quality else 'false' }}"
+      >
+        <div>
+          <div class="asset-name">
+            <span class="tool-badge badge-{{ asset.tool }}">{{ asset.tool | capitalize }}</span>
+            {{ asset.name }}
+          </div>
+          <div class="asset-meta">
+            {% if asset.owner_display %}{{ asset.owner_display }} &nbsp;·&nbsp; {% endif %}
+            {% if asset.updated_at %}Updated {{ asset.updated_at.strftime('%b %-d, %Y') }}{% else %}Updated: unknown{% endif %}
+          </div>
+          {% if asset.description %}<div class="asset-description">{{ asset.description | truncate(150) }}</div>{% endif %}
+          {% if asset.tags %}<div class="mt-1">{% for tag in asset.tags %}<span class="tag-pill" data-tag="{{ tag | lower }}">{{ tag }}</span>{% endfor %}</div>{% endif %}
+          {% if asset.related_terms %}<div class="related-terms">Related: {% for term in asset.related_terms %}<a href="#glossary-section" onclick="highlightTerm('{{ term | lower }}')">{{ term }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</div>{% endif %}
+        </div>
+        <div class="asset-actions">
+          <div class="asset-status">
+            {% if asset.status == 'active' %}<span class="status-active">● Active</span>
+            {% elif asset.status == 'stale' %}<span class="status-stale">▲ Stale</span>
+            {% else %}<span class="status-unknown">● Unknown</span>{% endif %}
+          </div>
+          {% if asset.url %}<a href="{{ asset.url }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary">Open →</a>{% endif %}
+        </div>
       </div>
-      <div class="glossary-definition">{{ term.definition }}</div>
-      {% if term.formula %}
-      <div class="glossary-formula">{{ term.formula }}</div>
-      {% endif %}
-      {% if term.dashboards %}
-      <div class="glossary-dashboards">
-        Dashboards: {% for name in term.dashboards %}<a onclick="jumpToDashboard('{{ name | lower }}')">{{ name }}</a>{% if not loop.last %}, {% endif %}{% endfor %}
-      </div>
-      {% endif %}
+      {% endfor %}
     </div>
-    {% endfor %}
+
+    <div id="no-results">No dashboards match your filters.</div>
+
+    <!-- Glossary section -->
+    {% if glossary_terms %}
+    <div id="glossary-section">
+      <hr class="my-4" />
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <h2 class="mb-0">Glossary &amp; Metrics</h2>
+        <input id="glossary-search" type="search" class="form-control form-control-sm"
+          placeholder="Search glossary…" autocomplete="off" style="max-width:240px;" />
+      </div>
+
+      {% set glossary_only = glossary_terms | selectattr('type', 'equalto', 'glossary') | list %}
+      {% set metrics_only  = glossary_terms | selectattr('type', 'equalto', 'metric')   | list %}
+
+      {% if glossary_only %}
+      <h3>Glossary Terms</h3>
+      {% for term in glossary_only %}
+      <div class="glossary-card" data-term="{{ term.term | lower }}" data-category="{{ term.category | lower }}" data-type="glossary">
+        <div>
+          <span class="glossary-term-name">{{ term.term }}</span>
+          <span class="badge-category badge-glossary">{{ term.category }}</span>
+        </div>
+        <div class="glossary-definition">{{ term.definition }}</div>
+        {% if term.dashboards %}
+        <div class="glossary-dashboards">Dashboards: {% for name in term.dashboards %}<a onclick="jumpToDashboard('{{ name | lower }}')">{{ name }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+      {% endif %}
+
+      {% if metrics_only %}
+      <h3>Metrics</h3>
+      {% for term in metrics_only %}
+      <div class="glossary-card" data-term="{{ term.term | lower }}" data-category="{{ term.category | lower }}" data-type="metric">
+        <div>
+          <span class="glossary-term-name">{{ term.term }}</span>
+          <span class="badge-category badge-metric">{{ term.category }}</span>
+          {% for tag in term.tags[1:] %}<span class="badge-category">{{ tag }}</span>{% endfor %}
+        </div>
+        <div class="glossary-definition">{{ term.definition }}</div>
+        {% if term.formula %}<div class="glossary-formula">{{ term.formula }}</div>{% endif %}
+        {% if term.dashboards %}
+        <div class="glossary-dashboards">Dashboards: {% for name in term.dashboards %}<a onclick="jumpToDashboard('{{ name | lower }}')">{{ name }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+      {% endif %}
+
+    </div>
     {% endif %}
 
-  </div>
-  {% endif %}
-
+  </main>
 </div>
 
 <script>
 (function () {
-  var searchEl = document.getElementById('search');
-  var activeBtn = document.getElementById('active-toggle');
-  var qualityBtn = document.getElementById('quality-toggle');
-  var filterBtns = document.querySelectorAll('.filter-btn');
-  var domainBtns = document.querySelectorAll('.domain-btn');
-  var cards = document.querySelectorAll('#asset-list .asset-card');
-  var noResults = document.getElementById('no-results');
-  var countEl = document.getElementById('count-visible');
+  var searchEl    = document.getElementById('search');
+  var qualityChk  = document.getElementById('quality-check');
+  var activeChk   = document.getElementById('active-check');
+  var clearBtn    = document.getElementById('clear-filters');
+  var chipsEl     = document.getElementById('active-chips');
+  var cards       = document.querySelectorAll('#asset-list .asset-card');
+  var noResults   = document.getElementById('no-results');
+  var countEl     = document.getElementById('count-visible');
   var glossarySearchEl = document.getElementById('glossary-search');
-  var glossaryCards = document.querySelectorAll('.glossary-card');
+  var glossaryCards    = document.querySelectorAll('.glossary-card');
+  var sidebarToggleBtn = document.getElementById('sidebar-toggle');
+  var sidebar          = document.getElementById('sidebar');
 
-  var activeTool = 'all';
+  var activeTool   = 'all';
   var activeDomain = 'all';
-  var activeTag = '';
-  var activeOnly = false;
-  var qualityOnly = true;
+  var activePod    = 'all';
+  var activeTag    = '';
+  var qualityOnly  = true;
+  var activeOnly   = false;
 
+  // ── Filter application ────────────────────────────────────────────
   function applyFilters() {
     var query = searchEl.value.toLowerCase().trim();
     var visible = 0;
 
     cards.forEach(function (card) {
-      var matchTool = activeTool === 'all' || card.dataset.tool === activeTool;
-      var matchActive = !activeOnly || card.dataset.status === 'active';
-      var matchSearch = !query
-        || card.dataset.name.indexOf(query) !== -1
-        || card.dataset.tags.indexOf(query) !== -1;
-      var matchDomain = activeDomain === 'all'
-        || (card.dataset.domains && card.dataset.domains.split(',').indexOf(activeDomain) !== -1);
-      var matchTag = !activeTag
-        || (card.dataset.tags && card.dataset.tags.split(',').indexOf(activeTag) !== -1);
+      var matchTool    = activeTool === 'all'   || card.dataset.tool === activeTool;
+      var matchDomain  = activeDomain === 'all' || (card.dataset.domains && card.dataset.domains.split(',').indexOf(activeDomain) !== -1);
+      var matchPod     = activePod === 'all'    || (card.dataset.pods && card.dataset.pods.split(',').indexOf(activePod) !== -1);
+      var matchTag     = !activeTag             || (card.dataset.tags && card.dataset.tags.split(',').indexOf(activeTag) !== -1);
+      var matchSearch  = !query || card.dataset.name.indexOf(query) !== -1 || (card.dataset.tags && card.dataset.tags.indexOf(query) !== -1);
       var matchQuality = !qualityOnly || card.dataset.quality === 'true';
+      var matchActive  = !activeOnly  || card.dataset.status === 'active';
 
-      if (matchTool && matchActive && matchSearch && matchDomain && matchTag && matchQuality) {
+      if (matchTool && matchDomain && matchPod && matchTag && matchSearch && matchQuality && matchActive) {
         card.classList.remove('hidden');
         visible++;
       } else {
@@ -478,116 +552,139 @@
 
     countEl.textContent = visible;
     noResults.style.display = visible === 0 ? 'block' : 'none';
+    updateChips();
   }
 
-  function applyGlossaryFilter() {
-    if (!glossarySearchEl) return;
-    var query = glossarySearchEl.value.toLowerCase().trim();
-    glossaryCards.forEach(function (card) {
-      var matchSearch = !query
-        || card.dataset.term.indexOf(query) !== -1
-        || card.dataset.category.indexOf(query) !== -1;
-      card.classList.toggle('hidden', !matchSearch);
+  // ── Active filter chips ───────────────────────────────────────────
+  var FILTER_LABELS = {
+    tool:   { all: null, tableau: 'Tableau', preset: 'Preset', databricks: 'Databricks' },
+    domain: { all: null },
+    pod:    { all: null, 'non-dsa': 'Non-DSA' }
+  };
+
+  function updateChips() {
+    var chips = [];
+    if (activeTool !== 'all')   chips.push({ label: FILTER_LABELS.tool[activeTool]   || activeTool,   reset: function () { setFilter('tool',   'all'); } });
+    if (activeDomain !== 'all') chips.push({ label: activeDomain,                                      reset: function () { setFilter('domain', 'all'); } });
+    if (activePod !== 'all')    chips.push({ label: FILTER_LABELS.pod[activePod]     || activePod,    reset: function () { setFilter('pod',    'all'); } });
+    if (activeTag)              chips.push({ label: '#' + activeTag,                                   reset: function () { clearTag(); } });
+    if (qualityOnly)            chips.push({ label: 'Recommended', reset: function () { qualityChk.checked = false; qualityOnly = false; applyFilters(); } });
+    if (activeOnly)             chips.push({ label: 'Active only', reset: function () { activeChk.checked = false; activeOnly = false; applyFilters(); } });
+
+    chipsEl.innerHTML = chips.map(function (c, i) {
+      return '<span class="filter-chip" data-chip="' + i + '">' + c.label + ' &times;</span>';
+    }).join('');
+
+    chipsEl.querySelectorAll('.filter-chip').forEach(function (el) {
+      el.addEventListener('click', function () { chips[+el.dataset.chip].reset(); });
     });
+
+    clearBtn.style.display = chips.length > 1 ? 'inline' : 'none';
   }
 
-  // Tool filter buttons
-  filterBtns.forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      filterBtns.forEach(function (b) { b.classList.remove('active'); });
-      btn.classList.add('active');
-      activeTool = btn.dataset.tool;
-      applyFilters();
+  // ── Sidebar filter item clicks ────────────────────────────────────
+  function setFilter(filterType, value) {
+    if (filterType === 'tool')   activeTool   = value;
+    if (filterType === 'domain') activeDomain = value;
+    if (filterType === 'pod')    activePod    = value;
+
+    document.querySelectorAll('.filter-item[data-filter="' + filterType + '"]').forEach(function (el) {
+      el.classList.toggle('active', el.dataset.value === value);
+    });
+    applyFilters();
+  }
+
+  document.querySelectorAll('.filter-item').forEach(function (el) {
+    el.addEventListener('click', function () {
+      setFilter(el.dataset.filter, el.dataset.value);
     });
   });
 
-  // Domain filter buttons
-  domainBtns.forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      domainBtns.forEach(function (b) { b.classList.remove('active'); });
-      btn.classList.add('active');
-      activeDomain = btn.dataset.domain;
-      applyFilters();
-    });
-  });
+  // ── Tag pill clicks ───────────────────────────────────────────────
+  function clearTag() {
+    activeTag = '';
+    document.querySelectorAll('.tag-pill').forEach(function (p) { p.classList.remove('active'); });
+    applyFilters();
+  }
 
-  // Tag pill clicks (toggle)
   document.addEventListener('click', function (e) {
     if (!e.target.classList.contains('tag-pill')) return;
     var tag = e.target.dataset.tag;
     if (activeTag === tag) {
-      activeTag = '';
-      document.querySelectorAll('.tag-pill').forEach(function (p) { p.classList.remove('active'); });
+      clearTag();
     } else {
       activeTag = tag;
       document.querySelectorAll('.tag-pill').forEach(function (p) {
         p.classList.toggle('active', p.dataset.tag === tag);
       });
+      applyFilters();
     }
+  });
+
+  // ── Toggles ───────────────────────────────────────────────────────
+  qualityChk.addEventListener('change', function () { qualityOnly = qualityChk.checked; applyFilters(); });
+  activeChk.addEventListener('change',  function () { activeOnly  = activeChk.checked;  applyFilters(); });
+
+  // ── Clear all ─────────────────────────────────────────────────────
+  clearBtn.addEventListener('click', function (e) {
+    e.preventDefault();
+    setFilter('tool', 'all');
+    setFilter('domain', 'all');
+    setFilter('pod', 'all');
+    clearTag();
+    qualityChk.checked = true;  qualityOnly = true;
+    activeChk.checked  = false; activeOnly  = false;
+    searchEl.value = '';
     applyFilters();
   });
 
-  // Active only toggle
-  activeBtn.addEventListener('click', function () {
-    activeOnly = !activeOnly;
-    activeBtn.classList.toggle('btn-warning', activeOnly);
-    activeBtn.classList.toggle('btn-outline-warning', !activeOnly);
-    applyFilters();
-  });
-
-  // Quality toggle (default ON — hides noise)
-  qualityBtn.addEventListener('click', function () {
-    qualityOnly = !qualityOnly;
-    qualityBtn.classList.toggle('btn-success', qualityOnly);
-    qualityBtn.classList.toggle('btn-outline-secondary', !qualityOnly);
-    qualityBtn.textContent = qualityOnly ? '\u2713 Recommended only' : 'Show all dashboards';
-    applyFilters();
-  });
-
-  // Search
+  // ── Search ────────────────────────────────────────────────────────
   searchEl.addEventListener('input', applyFilters);
 
-  // Glossary search
+  // ── Glossary search ───────────────────────────────────────────────
   if (glossarySearchEl) {
-    glossarySearchEl.addEventListener('input', applyGlossaryFilter);
+    glossarySearchEl.addEventListener('input', function () {
+      var q = glossarySearchEl.value.toLowerCase().trim();
+      glossaryCards.forEach(function (c) {
+        c.classList.toggle('hidden', !(!q || c.dataset.term.indexOf(q) !== -1 || c.dataset.category.indexOf(q) !== -1));
+      });
+    });
   }
 
-  // Apply filters on initial page load
+  // ── Mobile sidebar toggle ─────────────────────────────────────────
+  if (sidebarToggleBtn) {
+    sidebarToggleBtn.addEventListener('click', function () {
+      sidebar.classList.toggle('open');
+    });
+    document.addEventListener('click', function (e) {
+      if (sidebar.classList.contains('open') && !sidebar.contains(e.target) && e.target !== sidebarToggleBtn) {
+        sidebar.classList.remove('open');
+      }
+    });
+  }
+
+  // ── Initial render ────────────────────────────────────────────────
   applyFilters();
 })();
 
 function jumpToDashboard(name) {
-  // Clear all filters and search by dashboard name
   var searchEl = document.getElementById('search');
   searchEl.value = name;
-
-  // Reset tool filter
-  document.querySelectorAll('.filter-btn').forEach(function (b) { b.classList.remove('active'); });
-  var allBtn = document.querySelector('.filter-btn[data-tool="all"]');
-  if (allBtn) allBtn.classList.add('active');
-
-  // Reset domain filter
-  document.querySelectorAll('.domain-btn').forEach(function (b) { b.classList.remove('active'); });
-  var allDomainBtn = document.querySelector('.domain-btn[data-domain="all"]');
-  if (allDomainBtn) allDomainBtn.classList.add('active');
-
-  // Reset tag pills
+  // Reset all sidebar filters to 'all'
+  ['tool', 'domain', 'pod'].forEach(function (f) {
+    document.querySelectorAll('.filter-item[data-filter="' + f + '"]').forEach(function (el) {
+      el.classList.toggle('active', el.dataset.value === 'all');
+    });
+  });
   document.querySelectorAll('.tag-pill').forEach(function (p) { p.classList.remove('active'); });
-
-  // Trigger filter update by dispatching input event
   searchEl.dispatchEvent(new Event('input'));
-
-  // Scroll to asset list
-  var assetList = document.getElementById('asset-list');
-  if (assetList) assetList.scrollIntoView({ behavior: 'smooth' });
+  var list = document.getElementById('asset-list');
+  if (list) list.scrollIntoView({ behavior: 'smooth' });
 }
 
 function highlightTerm(termLower) {
-  var glossarySearch = document.getElementById('glossary-search');
-  if (glossarySearch) {
-    glossarySearch.value = termLower;
-    glossarySearch.dispatchEvent(new Event('input'));
-  }
+  var gs = document.getElementById('glossary-search');
+  if (gs) { gs.value = termLower; gs.dispatchEvent(new Event('input')); }
 }
 </script>
 

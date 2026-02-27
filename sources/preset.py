@@ -29,14 +29,13 @@ def fetch(config: dict) -> list[dict]:
 
     try:
         dashboards = _paginate(f"{workspace_url}/api/v1/dashboard/", headers)
-        if dashboards:
-            sample_owners = dashboards[0].get("owners", [])
-            logger.info("Preset sample owner objects: %s", sample_owners[:2])
         for d in dashboards:
             owners = d.get("owners", [])
             if owners:
                 o = owners[0]
-                owner_name = o.get("email") or o.get("username") or None
+                first = o.get("first_name", "")
+                last = o.get("last_name", "")
+                owner_name = f"{first} {last}".strip() if (first or last) else None
             else:
                 owner_name = None
 
