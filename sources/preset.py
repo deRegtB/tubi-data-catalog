@@ -64,18 +64,25 @@ def fetch(config: dict) -> list[dict]:
 
 
 def _fetch_user_emails(workspace_url: str, headers: dict) -> dict:
-    """Return {user_id: email} for all Preset workspace users."""
+    """Return {user_id: email} for all Preset workspace users.
+
+    Tries the FAB /api/v1/security/users/ endpoint (may be restricted in Preset).
+    Falls back gracefully — callers use first/last name string if this returns {}.
+    """
     result = {}
-    try:
-        users = _paginate(f"{workspace_url}/api/v1/security/users/", headers)
-        for u in users:
-            uid = u.get("id")
-            email = u.get("username") or u.get("email")
-            if uid and email and "@" in email:
-                result[uid] = email
-        logger.info("Preset: resolved %d user emails", len(result))
-    except Exception as e:
-        logger.warning("Preset user email fetch failed (will use name fallback): %s", e)
+    for path in ("/api/v1/security/users/", "/api/v1/security/users"):
+        try:
+            users = _paginate(f"{workspace_url}{path}", headers)
+            for u in users:
+                uid = u.get("id")
+                email = u.get("username") or u.get("email")
+                if uid and email and "@" in email:
+                    result[uid] = email
+            logger.info("Preset: resolved %d user emails via %s", len(result), path)
+            return result
+        except Exception as e:
+            logger.debug("Preset user lookup via %s failed: %s", path, e)
+    logger.warning("Preset: user email lookup unavailable; owners will display as 'First Last'")
     return result
 
 

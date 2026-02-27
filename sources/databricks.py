@@ -27,6 +27,8 @@ def fetch(config: dict) -> list[dict]:
         dashboards = _list_dashboards(host, headers)
         # Fetch individual details in parallel to get path/owner
         details = _fetch_details(host, headers, dashboards)
+        paths_found = sum(1 for d in details if d.get("path"))
+        logger.info("Databricks: %d/%d dashboards have workspace path", paths_found, len(details))
         for d in details:
             if d.get("lifecycle_state") == "TRASHED":
                 continue
