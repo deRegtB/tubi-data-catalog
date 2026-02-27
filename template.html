@@ -540,7 +540,7 @@
 var CANONICAL_DOMAINS = {{ canonical_domains | tojson }};
 var DSA_PODS = {{ dsa_pods | tojson }};
 var POD_SLUG = {{ pod_slug | tojson }};
-var SERVER_OVERRIDES = {{ overrides_json }};
+var SERVER_OVERRIDES = {{ overrides_json | safe }};
 var REPO_OWNER   = 'deRegtB';
 var REPO_NAME    = 'tubi-data-catalog';
 // No token baked into HTML — pending count uses the reviewer's Settings PAT
