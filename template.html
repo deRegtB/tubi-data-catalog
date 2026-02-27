@@ -528,7 +528,7 @@ var POD_SLUG = {{ pod_slug | tojson }};
 var SERVER_OVERRIDES = {{ overrides_json }};
 var REPO_OWNER   = 'deRegtB';
 var REPO_NAME    = 'tubi-data-catalog';
-var ISSUES_TOKEN = '{{ issues_token | e }}';
+// No token baked into HTML — pending count uses the reviewer's Settings PAT
 </script>
 
 <!-- Settings modal -->
@@ -1035,18 +1035,13 @@ var ISSUES_TOKEN = '{{ issues_token | e }}';
     commitOverride(name, ov, creds.token, creds.name || 'anonymous');
   });
 
-  // Send request — creates a GitHub Issue (scoped token, Issues: Write only)
+  // Request update — opens a pre-filled GitHub Issue in a new tab (no token needed)
   document.getElementById('editProposeBtn').addEventListener('click', function() {
     if (!editTargetCard) return;
     var name      = editTargetCard.dataset.displayName;
     var card      = editTargetCard;
     var form      = collectEditForm();
     var requester = document.getElementById('editRequesterName').value.trim() || 'anonymous';
-
-    if (!ISSUES_TOKEN) {
-      showToast('Request queue not configured — ask Bryan to add GITHUB_ISSUES_TOKEN to repo secrets.', 'warning');
-      return;
-    }
 
     var slug_to_name = {};
     DSA_PODS.forEach(function(p){ slug_to_name[POD_SLUG[p]] = p; });
@@ -1058,78 +1053,36 @@ var ISSUES_TOKEN = '{{ issues_token | e }}';
     var currentPodName  = slug_to_name[currentPodSlug] || currentPodSlug || 'Non-DSA';
     var proposedPodName = form.pods[0] ? (slug_to_name[form.pods[0]] || form.pods[0]) : '—';
 
-    // Store proposed values as JSON in a fenced code block so the reviewer
-    // can parse them precisely and apply in one click from the catalog.
-    var payload = {
-      dashboard:  name,
-      domains:    form.domains,
-      pods:       form.pods,
-      featured:   form.featured,
-      status:     form.status,
-      note:       form.note,
-      requester:  requester,
-      url:        card.dataset.url || '',
-    };
-
     var body = [
       '**Requested by:** ' + requester,
-      '**Dashboard:** ' + name,
       (card.dataset.url ? '**Dashboard URL:** ' + card.dataset.url : ''),
       '',
       '| Field | Current | Proposed |',
       '|---|---|---|',
-      '| Domains | ' + currentDomains + ' | ' + (form.domains.join(', ') || '—') + ' |',
-      '| Team | '   + currentPodName  + ' | ' + proposedPodName + ' |',
+      '| Domains | '  + currentDomains + ' | ' + (form.domains.join(', ') || '—') + ' |',
+      '| Team | '     + currentPodName  + ' | ' + proposedPodName + ' |',
       '| Featured | ' + (card.dataset.featured === 'true' ? 'Yes' : 'No') + ' | ' + (form.featured ? 'Yes' : 'No') + ' |',
-      '| Status | '  + (card.dataset.status || 'auto') + ' | ' + (form.status || 'auto') + ' |',
+      '| Status | '   + (card.dataset.status || 'auto') + ' | ' + (form.status || 'auto') + ' |',
       (form.note ? '\n**Note:** ' + form.note : ''),
-      '',
-      '```json',
-      JSON.stringify(payload, null, 2),
-      '```',
     ].filter(function(l){ return l !== undefined; }).join('\n');
 
-    var btn = document.getElementById('editProposeBtn');
-    btn.disabled = true;
-    btn.textContent = 'Submitting…';
+    var issueUrl = 'https://github.com/' + REPO_OWNER + '/' + REPO_NAME + '/issues/new'
+      + '?title='  + encodeURIComponent('Override request: ' + name)
+      + '&body='   + encodeURIComponent(body)
+      + '&labels=' + encodeURIComponent('override-proposal');
 
-    fetch('https://api.github.com/repos/' + REPO_OWNER + '/' + REPO_NAME + '/issues', {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Bearer ' + ISSUES_TOKEN,
-        'Accept': 'application/vnd.github+json',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        title:  'Override request: ' + name,
-        body:   body,
-        labels: ['override-proposal'],
-      }),
-    })
-    .then(function(r) {
-      if (!r.ok) return r.json().then(function(e) { throw e.message || r.status; });
-      return r.json();
-    })
-    .then(function(issue) {
-      editModal.hide();
-      showToast('✓ Request #' + issue.number + ' submitted — a reviewer will apply it when ready.', 'success');
-      loadPendingCount();
-    })
-    .catch(function(err) {
-      showToast('Could not submit request: ' + err, 'danger');
-    })
-    .finally(function() {
-      btn.disabled = false;
-      btn.textContent = 'Request update';
-    });
+    window.open(issueUrl, '_blank', 'noopener');
+    editModal.hide();
+    showToast('GitHub opened — fill in your details and click Submit.', 'info');
   });
 
   // ── Pending-request badge ─────────────────────────────────────────
   function loadPendingCount() {
-    if (!ISSUES_TOKEN) return;
+    var token = getCreds().token;
+    if (!token) return;
     fetch('https://api.github.com/repos/' + REPO_OWNER + '/' + REPO_NAME +
           '/issues?labels=override-proposal&state=open&per_page=1', {
-      headers: { 'Authorization': 'Bearer ' + ISSUES_TOKEN, 'Accept': 'application/vnd.github+json' },
+      headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json' },
     })
     .then(function(r) {
       var total = parseInt(r.headers.get('Link') ? r.headers.get('Link').match(/page=(\d+)>; rel="last"/) && RegExp.$1 : 1, 10) || 0;

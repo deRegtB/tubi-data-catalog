@@ -47,7 +47,6 @@ jobs:
           DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
           DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
           GLOSSARY_GITHUB_TOKEN: ${{ secrets.GLOSSARY_GITHUB_TOKEN }}
-          GITHUB_ISSUES_TOKEN: ${{ secrets.GITHUB_ISSUES_TOKEN }}
 
       - name: Prepare Pages output
         run: mkdir -p public && cp catalog.html public/index.html
