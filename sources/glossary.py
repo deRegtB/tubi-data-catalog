@@ -1,4 +1,4 @@
-"""Fetch glossary and metrics terms from the adRise/dsa-context private GitHub repo."""
+"""Fetch glossary terms and metrics from adRise/data_science SQL files."""
 
 import base64
 import logging
@@ -7,8 +7,11 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-REPO = "adRise/dsa-context"
-FILES = ["context/glossary.yaml", "context/metrics.yaml"]
+REPO = "adRise/data_science"
+DIRS = {
+    "glossary/dimensions": "Dimension",
+    "glossary/metrics": "Metric",
+}
 
 
 def fetch(config) -> list[dict]:
@@ -21,48 +24,80 @@ def fetch(config) -> list[dict]:
         "Accept": "application/vnd.github+json",
     }
     terms = []
-    for filepath in FILES:
+    for path, category in DIRS.items():
         try:
-            raw = _fetch_file(headers, filepath)
-            terms.extend(_parse(raw, filepath))
+            files = _list_dir(headers, path)
+            logger.info("Glossary: %d files in %s", len(files), path)
+            for f in files:
+                if f.get("type") != "file":
+                    continue
+                try:
+                    raw = _decode_file(f)
+                    term = _parse_sql_file(f["name"], raw, category)
+                    if term:
+                        terms.append(term)
+                except Exception as e:
+                    logger.debug("Glossary: skipping %s: %s", f["name"], e)
         except Exception as e:
-            logger.error("Glossary: failed to load %s: %s", filepath, e)
+            logger.error("Glossary: failed to list %s: %s", path, e)
+    logger.info("Glossary: loaded %d terms total", len(terms))
     return terms
 
 
-def _fetch_file(headers, filepath) -> str:
-    url = f"https://api.github.com/repos/{REPO}/contents/{filepath}"
+def _list_dir(headers: dict, path: str) -> list[dict]:
+    url = f"https://api.github.com/repos/{REPO}/contents/{path}"
     resp = requests.get(url, headers=headers, timeout=30)
     resp.raise_for_status()
-    return base64.b64decode(resp.json()["content"].replace("\n", "")).decode("utf-8")
+    return resp.json()
 
 
-def _parse(raw_yaml, filepath) -> list[dict]:
-    import yaml
+def _decode_file(file_entry: dict) -> str:
+    content = file_entry.get("content", "")
+    raw_bytes = base64.b64decode(content.replace("\n", ""))
+    try:
+        return raw_bytes.decode("utf-8")
+    except UnicodeDecodeError:
+        return raw_bytes.decode("latin-1")
 
-    data = yaml.safe_load(raw_yaml)
-    terms = []
-    # glossary.yaml: top-level key is "glossary"
-    for key, entry in (data.get("glossary") or {}).items():
-        terms.append({
-            "term": entry.get("term", key),
-            "definition": entry.get("definition", ""),
-            "category": "Glossary",
-            "type": "glossary",
-            "tags": [],
-            "related_term_keys": entry.get("related_terms", []),
-            "dashboards": [],
-        })
-    # metrics.yaml: top-level key is "metrics"
-    for key, entry in (data.get("metrics") or {}).items():
-        terms.append({
-            "term": entry.get("name", key),
-            "definition": entry.get("definition", ""),
-            "category": entry.get("tags", ["Metric"])[0] if entry.get("tags") else "Metric",
-            "type": "metric",
-            "tags": entry.get("tags", []),
-            "formula": entry.get("formula", ""),
-            "related_term_keys": [],
-            "dashboards": [],
-        })
-    return terms
+
+def _parse_sql_file(filename: str, content: str, category: str) -> dict | None:
+    # Term name: strip .sql extension, replace underscores with spaces
+    name = filename
+    if name.lower().endswith(".sql"):
+        name = name[:-4]
+    term = name.replace("_", " ").strip()
+    if not term:
+        return None
+
+    # Split leading comment lines from SQL body
+    lines = content.splitlines()
+    comment_lines = []
+    sql_lines = []
+    in_comments = True
+    for line in lines:
+        stripped = line.strip()
+        if in_comments and stripped.startswith("--"):
+            # Strip the comment prefix and any leading/trailing whitespace
+            comment_lines.append(stripped.lstrip("-").strip())
+        else:
+            in_comments = False
+            sql_lines.append(line)
+
+    definition = " ".join(l for l in comment_lines if l).strip()
+    # Clean up common prefixes like "Query Purpose:", "Data Source:" from definition
+    for prefix in ("Query Purpose:", "query purpose:"):
+        if definition.lower().startswith(prefix.lower()):
+            definition = definition[len(prefix):].strip()
+
+    sql = "\n".join(sql_lines).strip()
+
+    return {
+        "term": term,
+        "definition": definition,
+        "category": category,
+        "type": "metric" if category == "Metric" else "glossary",
+        "tags": [category],
+        "formula": sql,
+        "related_term_keys": [],
+        "dashboards": [],
+    }
