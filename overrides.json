@@ -7,10 +7,23 @@
     "pods": [
       "core-experiences"
     ],
-    "featured": false,
+    "featured": true,
     "status": "",
     "note": "",
     "updated_by": "Bryan deRegt",
-    "updated_at": "2026-02-27T22:42:14.699Z"
+    "updated_at": "2026-02-27T22:25:29.418Z"
+  },
+  "Graduated Experiment Results": {
+    "domains": [
+      "Experimentation"
+    ],
+    "pods": [
+      "experimentation"
+    ],
+    "featured": true,
+    "status": "active",
+    "note": "",
+    "updated_by": "Bryan deRegt",
+    "updated_at": "2026-02-27T22:45:27.595Z"
   }
 }
