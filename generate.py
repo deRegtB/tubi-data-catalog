@@ -387,7 +387,8 @@ def enrich_assets(assets: list[dict], metadata: dict, overrides: dict | None = N
             asset["status"] = status_override
 
         # overrides.json — highest precedence, includes committer info
-        ov = overrides.get(asset["name"]) or overrides.get(name_lower)
+        # Key is URL (unique per dashboard); fall back to name for backward compat
+        ov = overrides.get(asset.get("url", "")) or overrides.get(asset["name"]) or overrides.get(name_lower)
         asset["override_meta"] = None
         if ov:
             if ov.get("domains"):

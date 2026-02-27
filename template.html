@@ -843,9 +843,10 @@ var REPO_NAME    = 'tubi-data-catalog';
   }
 
   // Store original server-rendered data-* before any JS modification
+  // Keyed by URL (unique per dashboard) so same-name duplicates don't collide.
   var originals = {};
   document.querySelectorAll('.asset-card').forEach(function(card) {
-    var key = card.dataset.displayName;
+    var key = card.dataset.url || card.dataset.displayName;
     if (key) originals[key] = {
       domains:  card.dataset.domains,
       pods:     card.dataset.pods,
@@ -890,7 +891,7 @@ var REPO_NAME    = 'tubi-data-catalog';
   }
 
   function restoreCard(card) {
-    var key = card.dataset.displayName;
+    var key = card.dataset.url || card.dataset.displayName;
     var orig = originals[key];
     if (!orig) return;
     card.dataset.domains  = orig.domains;
@@ -904,8 +905,8 @@ var REPO_NAME    = 'tubi-data-catalog';
 
   function applyAllOverrides() {
     document.querySelectorAll('.asset-card').forEach(function(card) {
-      var name = card.dataset.displayName;
-      if (!name) return;
+      var id = card.dataset.url || card.dataset.displayName;
+      if (!id) return;
       // Server-baked overrides (already reflected in data-* from Jinja but badge them)
       if (card.dataset.overrideBy) {
         applyCardOverride(card, {
@@ -914,8 +915,8 @@ var REPO_NAME    = 'tubi-data-catalog';
         }, 'server');
       }
       // Local pending overrides take precedence visually
-      if (localOverrides[name]) {
-        applyCardOverride(card, localOverrides[name], 'local');
+      if (localOverrides[id]) {
+        applyCardOverride(card, localOverrides[id], 'local');
       }
     });
   }
@@ -976,10 +977,11 @@ var REPO_NAME    = 'tubi-data-catalog';
     if (!card) return;
     editTargetCard = card;
 
+    var id   = card.dataset.url || card.dataset.displayName || '';
     var name = card.dataset.displayName || '';
     // Priority: localOverrides > SERVER_OVERRIDES > card data-*
-    var localOv  = localOverrides[name] || {};
-    var serverOv = SERVER_OVERRIDES[name] || {};
+    var localOv  = localOverrides[id] || {};
+    var serverOv = SERVER_OVERRIDES[id] || {};
     var ov       = Object.assign({}, serverOv, localOv);
 
     var currentDomains  = ov.domains || card.dataset.domains.split(',').filter(Boolean);
@@ -1038,14 +1040,16 @@ var REPO_NAME    = 'tubi-data-catalog';
   // Save to repo (PAT required — button only shown when PAT is set)
   document.getElementById('editSaveBtn').addEventListener('click', function() {
     if (!editTargetCard) return;
-    var name = editTargetCard.dataset.displayName;
+    var id    = editTargetCard.dataset.url || editTargetCard.dataset.displayName;
+    var name  = editTargetCard.dataset.displayName;
     var creds = getCreds();
     var ov = Object.assign(collectEditForm(), {
+      name:       name,
       updated_by: creds.name || 'anonymous',
       updated_at: new Date().toISOString(),
     });
     editModal.hide();
-    commitOverride(name, ov, creds.token, creds.name || 'anonymous');
+    commitOverride(id, name, ov, creds.token, creds.name || 'anonymous');
   });
 
   // Request update — opens a pre-filled GitHub Issue in a new tab (no token needed)
@@ -1118,15 +1122,16 @@ var REPO_NAME    = 'tubi-data-catalog';
 
   document.getElementById('editClearBtn').addEventListener('click', function() {
     if (!editTargetCard) return;
-    var name = editTargetCard.dataset.displayName;
+    var id    = editTargetCard.dataset.url || editTargetCard.dataset.displayName;
+    var name  = editTargetCard.dataset.displayName;
     var creds = getCreds();
-    if (SERVER_OVERRIDES[name] && creds.token) {
+    if (SERVER_OVERRIDES[id] && creds.token) {
       // Remove from repo too
       var merged = Object.assign({}, SERVER_OVERRIDES);
-      delete merged[name];
+      delete merged[id];
       var msg = 'Remove override: ' + name + (creds.name ? ' — by ' + creds.name : '');
       pushOverrides(merged, creds.token, msg).then(function() {
-        delete localOverrides[name]; saveLocal();
+        delete localOverrides[id]; saveLocal();
         restoreCard(editTargetCard);
         applyFilters();
         showToast('Override removed and repo updated — rebuilding…', 'success');
@@ -1134,7 +1139,7 @@ var REPO_NAME    = 'tubi-data-catalog';
         showToast('GitHub error: ' + err, 'danger');
       });
     } else {
-      delete localOverrides[name]; saveLocal();
+      delete localOverrides[id]; saveLocal();
       restoreCard(editTargetCard);
       applyFilters();
     }
@@ -1142,26 +1147,26 @@ var REPO_NAME    = 'tubi-data-catalog';
   });
 
   // ── GitHub API helpers ────────────────────────────────────────────
-  function commitOverride(dashName, ov, token, committer) {
+  function commitOverride(dashId, dashName, ov, token, committer) {
     showToast('Saving to repo…', 'info');
     // Merge with current SERVER_OVERRIDES; local changes overlay on top
     var merged = Object.assign({}, SERVER_OVERRIDES);
-    merged[dashName] = ov;
+    merged[dashId] = ov;
     var note = ov.note ? ': "' + ov.note + '"' : '';
     var msg = 'Override: ' + dashName + note + ' — by ' + committer;
     pushOverrides(merged, token, msg).then(function() {
       // Update local copy of server overrides so UI reflects it immediately
-      SERVER_OVERRIDES[dashName] = ov;
-      delete localOverrides[dashName]; saveLocal();
-      // Update card
-      var card = document.querySelector('.asset-card[data-display-name="' + dashName.replace(/"/g, '\\"') + '"]');
+      SERVER_OVERRIDES[dashId] = ov;
+      delete localOverrides[dashId]; saveLocal();
+      // Find card by URL (handles same-name duplicates)
+      var card = Array.from(document.querySelectorAll('.asset-card')).find(function(c) { return (c.dataset.url || c.dataset.displayName) === dashId; });
       if (card) { restoreCard(card); applyCardOverride(card, ov, 'repo'); }
       applyFilters();
       showToast('✓ Saved to repo — catalog rebuilding in ~1 min', 'success');
     }).catch(function(err) {
       showToast('GitHub error: ' + err + '. Override saved locally instead.', 'warning');
-      localOverrides[dashName] = ov; saveLocal();
-      var card = document.querySelector('.asset-card[data-display-name="' + dashName.replace(/"/g, '\\"') + '"]');
+      localOverrides[dashId] = ov; saveLocal();
+      var card = Array.from(document.querySelectorAll('.asset-card')).find(function(c) { return (c.dataset.url || c.dataset.displayName) === dashId; });
       if (card) { restoreCard(card); applyCardOverride(card, ov, 'local'); }
       applyFilters();
     });
@@ -1213,8 +1218,8 @@ var REPO_NAME    = 'tubi-data-catalog';
     localOverrides = {};
     saveLocal();
     document.querySelectorAll('.asset-card').forEach(function(card) {
-      var name = card.dataset.displayName;
-      if (!SERVER_OVERRIDES[name]) restoreCard(card);
+      var id = card.dataset.url || card.dataset.displayName;
+      if (!SERVER_OVERRIDES[id]) restoreCard(card);
     });
     applyFilters();
     bootstrap.Modal.getInstance(document.getElementById('exportModal')).hide();
