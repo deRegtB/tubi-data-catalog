@@ -71,6 +71,11 @@
     }
     .filter-item:hover { background: #f3f4f6; }
     .filter-item.active { background: #eff6ff; color: #1d4ed8; font-weight: 600; }
+    .owner-team-row { display: flex; align-items: center; width: 100%; }
+    .owner-team-label { flex: 1; }
+    .owner-expand-btn { font-size: 0.6rem; padding: 0 0.3rem; color: #9ca3af; cursor: pointer; flex-shrink: 0; }
+    .owner-items { display: none; padding-left: 0.75rem; }
+    .filter-item-owner { font-size: 0.78rem; }
     .filter-item .dot {
       width: 7px; height: 7px;
       border-radius: 50%;
@@ -336,6 +341,14 @@
     </div>
     {% endfor %}
 
+    <!-- Owner -->
+    <div class="sidebar-section-title">Owner</div>
+    <div id="owner-filter-section">
+      <div class="filter-item active" data-filter="pod" data-value="all">
+        <span class="dot"></span> All Owners
+      </div>
+    </div>
+
     <!-- Options -->
     <div class="sidebar-section-title">Options</div>
     <label class="sidebar-toggle">
@@ -396,6 +409,7 @@
         data-quality="{{ 'true' if asset.quality else 'false' }}"
         data-url="{{ asset.url | e }}"
         data-display-name="{{ asset.name | e }}"
+        data-owner="{{ asset.owner_display | lower | e if asset.owner_display else '' }}"
         data-override-by="{{ (asset.override_meta.updated_by) if asset.override_meta else '' }}"
         data-override-at="{{ (asset.override_meta.updated_at) if asset.override_meta else '' }}"
       >
@@ -445,6 +459,7 @@
         data-quality="{{ 'true' if asset.quality else 'false' }}"
         data-url="{{ asset.url | e }}"
         data-display-name="{{ asset.name | e }}"
+        data-owner="{{ asset.owner_display | lower | e if asset.owner_display else '' }}"
         data-override-by="{{ (asset.override_meta.updated_by) if asset.override_meta else '' }}"
         data-override-at="{{ (asset.override_meta.updated_at) if asset.override_meta else '' }}"
       >
@@ -681,6 +696,7 @@ var REPO_NAME    = 'tubi-data-catalog';
   var activeTool   = 'all';
   var activeDomain = 'all';
   var activePod    = 'all';
+  var activeOwner  = '';
   var activeTag    = '';
   var qualityOnly  = true;
   var activeOnly   = false;
@@ -694,12 +710,13 @@ var REPO_NAME    = 'tubi-data-catalog';
       var matchTool    = activeTool === 'all'   || card.dataset.tool === activeTool;
       var matchDomain  = activeDomain === 'all' || (card.dataset.domains && card.dataset.domains.split(',').indexOf(activeDomain) !== -1);
       var matchPod     = activePod === 'all'    || (card.dataset.pods && card.dataset.pods.split(',').indexOf(activePod) !== -1);
+      var matchOwner   = !activeOwner           || card.dataset.owner === activeOwner;
       var matchTag     = !activeTag             || (card.dataset.tags && card.dataset.tags.split(',').indexOf(activeTag) !== -1);
       var matchSearch  = !query || card.dataset.name.indexOf(query) !== -1 || (card.dataset.tags && card.dataset.tags.indexOf(query) !== -1);
       var matchQuality = !qualityOnly || card.dataset.quality === 'true';
       var matchActive  = !activeOnly  || card.dataset.status === 'active';
 
-      if (matchTool && matchDomain && matchPod && matchTag && matchSearch && matchQuality && matchActive) {
+      if (matchTool && matchDomain && matchPod && matchOwner && matchTag && matchSearch && matchQuality && matchActive) {
         card.classList.remove('hidden');
         visible++;
       } else {
@@ -723,7 +740,8 @@ var REPO_NAME    = 'tubi-data-catalog';
     var chips = [];
     if (activeTool !== 'all')   chips.push({ label: FILTER_LABELS.tool[activeTool]   || activeTool,   reset: function () { setFilter('tool',   'all'); } });
     if (activeDomain !== 'all') chips.push({ label: activeDomain,                                      reset: function () { setFilter('domain', 'all'); } });
-    if (activePod !== 'all')    chips.push({ label: FILTER_LABELS.pod[activePod]     || activePod,    reset: function () { setFilter('pod',    'all'); } });
+    if (activePod !== 'all')    chips.push({ label: FILTER_LABELS.pod[activePod]     || activePod,    reset: function () { setFilter('pod', 'all'); activeOwner = ''; buildOwnerFilter(); } });
+    if (activeOwner)            chips.push({ label: activeOwner.split('@')[0] || activeOwner,          reset: function () { activeOwner = ''; buildOwnerFilter(); applyFilters(); } });
     if (activeTag)              chips.push({ label: '#' + activeTag,                                   reset: function () { clearTag(); } });
     if (qualityOnly)            chips.push({ label: 'Recommended', reset: function () { qualityChk.checked = false; qualityOnly = false; applyFilters(); } });
     if (activeOnly)             chips.push({ label: 'Active only', reset: function () { activeChk.checked = false; activeOnly = false; applyFilters(); } });
@@ -788,6 +806,8 @@ var REPO_NAME    = 'tubi-data-catalog';
     setFilter('tool', 'all');
     setFilter('domain', 'all');
     setFilter('pod', 'all');
+    activeOwner = '';
+    buildOwnerFilter();
     clearTag();
     qualityChk.checked = true;  qualityOnly = true;
     activeChk.checked  = false; activeOnly  = false;
@@ -1090,6 +1110,87 @@ var REPO_NAME    = 'tubi-data-catalog';
     editModal.hide();
     showToast('GitHub opened — fill in your details and click Submit.', 'info');
   });
+
+  // ── Owner filter (hierarchical: team → individual owner) ──────────
+  function buildOwnerFilter() {
+    var section = document.getElementById('owner-filter-section');
+    if (!section) return;
+
+    // Build pod → owners map from card data
+    var podToOwners = {};
+    cards.forEach(function(card) {
+      var pods = (card.dataset.pods || '').split(',').filter(Boolean);
+      if (!pods.length) pods = ['non-dsa'];
+      var owner = (card.dataset.owner || '').trim();
+      pods.forEach(function(pod) {
+        if (!podToOwners[pod]) podToOwners[pod] = [];
+        if (owner && podToOwners[pod].indexOf(owner) === -1) podToOwners[pod].push(owner);
+      });
+    });
+
+    function teamBlock(label, slug) {
+      var owners = (podToOwners[slug] || []).slice().sort();
+      var isActive = activePod === slug;
+      var html = '<div class="filter-item' + (isActive && !activeOwner ? ' active' : '') + '" data-filter="pod" data-value="' + slug + '">';
+      html += '<span class="dot"></span><span class="owner-team-label">' + label + '</span>';
+      if (owners.length) html += '<span class="owner-expand-btn" data-target="owners-' + slug + '">▶</span>';
+      html += '</div>';
+      if (owners.length) {
+        var expanded = isActive; // auto-expand active team
+        html += '<div class="owner-items" id="owners-' + slug + '" style="' + (expanded ? '' : 'display:none') + '">';
+        owners.forEach(function(owner) {
+          var display = owner.indexOf('@') !== -1 ? owner.split('@')[0] : owner;
+          html += '<div class="filter-item filter-item-owner' + (activeOwner === owner ? ' active' : '') + '" data-filter="owner" data-value="' + owner.replace(/"/g, '&quot;') + '">';
+          html += '<span class="dot"></span>' + display + '</div>';
+        });
+        html += '</div>';
+      }
+      return html;
+    }
+
+    var html = '<div class="filter-item' + (activePod === 'all' ? ' active' : '') + '" data-filter="pod" data-value="all"><span class="dot"></span> All Owners</div>';
+    DSA_PODS.forEach(function(name) { html += teamBlock(name, POD_SLUG[name]); });
+    html += teamBlock('Non-DSA', 'non-dsa');
+    section.innerHTML = html;
+
+    // Team row clicks
+    section.querySelectorAll('.filter-item[data-filter="pod"]').forEach(function(el) {
+      el.addEventListener('click', function() {
+        activeOwner = '';
+        setFilter('pod', el.dataset.value);
+        buildOwnerFilter(); // re-render to expand active team
+      });
+    });
+
+    // Expand arrow clicks (toggle only — does not change filter)
+    section.querySelectorAll('.owner-expand-btn').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var target = document.getElementById(btn.dataset.target);
+        if (!target) return;
+        var open = target.style.display !== 'none';
+        target.style.display = open ? 'none' : '';
+        btn.textContent = open ? '▶' : '▼';
+      });
+    });
+
+    // Individual owner clicks
+    section.querySelectorAll('.filter-item-owner').forEach(function(el) {
+      el.addEventListener('click', function() {
+        activeOwner = el.dataset.value;
+        // Find which pod this owner belongs to and set it
+        var group = el.closest('.owner-items');
+        if (group) {
+          var podEl = group.previousElementSibling;
+          if (podEl && podEl.dataset.value) activePod = podEl.dataset.value;
+        }
+        buildOwnerFilter();
+        applyFilters();
+      });
+    });
+  }
+
+  buildOwnerFilter();
 
   // ── Pending-request badge ─────────────────────────────────────────
   function loadPendingCount() {
