@@ -71,11 +71,13 @@
     }
     .filter-item:hover { background: #f3f4f6; }
     .filter-item.active { background: #eff6ff; color: #1d4ed8; font-weight: 600; }
-    .owner-team-row { display: flex; align-items: center; width: 100%; }
-    .owner-team-label { flex: 1; }
-    .owner-expand-btn { font-size: 0.6rem; padding: 0 0.3rem; color: #9ca3af; cursor: pointer; flex-shrink: 0; }
-    .owner-items { display: none; padding-left: 0.75rem; }
-    .filter-item-owner { font-size: 0.78rem; }
+    .owner-search-input { width: 100%; box-sizing: border-box; padding: 0.3rem 0.5rem; font-size: 0.8rem; border: 1px solid #e5e7eb; border-radius: 4px; outline: none; background: white; }
+    .owner-search-input:focus { border-color: #6366f1; }
+    .owner-search-results { background: white; border: 1px solid #e5e7eb; border-radius: 4px; max-height: 180px; overflow-y: auto; margin-top: 0.25rem; box-shadow: 0 2px 6px rgba(0,0,0,.08); }
+    .owner-result-item { padding: 0.3rem 0.5rem; font-size: 0.8rem; cursor: pointer; }
+    .owner-result-item:hover { background: #f3f4f6; }
+    .owner-active-tag { display: inline-flex; align-items: center; gap: 0.3rem; background: #ede9fe; color: #5b21b6; border-radius: 999px; padding: 0.15rem 0.5rem; font-size: 0.75rem; margin-top: 0.35rem; }
+    .owner-active-tag button { background: none; border: none; cursor: pointer; color: #5b21b6; font-size: 0.85rem; line-height: 1; padding: 0; }
     .filter-item .dot {
       width: 7px; height: 7px;
       border-radius: 50%;
@@ -344,9 +346,9 @@
     <!-- Owner -->
     <div class="sidebar-section-title">Owner</div>
     <div id="owner-filter-section">
-      <div class="filter-item active" data-filter="pod" data-value="all">
-        <span class="dot"></span> All Owners
-      </div>
+      <input type="text" id="owner-search-input" class="owner-search-input" placeholder="Search by name…" autocomplete="off">
+      <div id="owner-search-results" class="owner-search-results" style="display:none"></div>
+      <div id="owner-active-chip" style="display:none"></div>
     </div>
 
     <!-- Options -->
@@ -740,8 +742,8 @@ var REPO_NAME    = 'tubi-data-catalog';
     var chips = [];
     if (activeTool !== 'all')   chips.push({ label: FILTER_LABELS.tool[activeTool]   || activeTool,   reset: function () { setFilter('tool',   'all'); } });
     if (activeDomain !== 'all') chips.push({ label: activeDomain,                                      reset: function () { setFilter('domain', 'all'); } });
-    if (activePod !== 'all')    chips.push({ label: FILTER_LABELS.pod[activePod]     || activePod,    reset: function () { setFilter('pod', 'all'); activeOwner = ''; buildOwnerFilter(); } });
-    if (activeOwner)            chips.push({ label: activeOwner.split('@')[0] || activeOwner,          reset: function () { activeOwner = ''; buildOwnerFilter(); applyFilters(); } });
+    if (activePod !== 'all')    chips.push({ label: FILTER_LABELS.pod[activePod]     || activePod,    reset: function () { setFilter('pod', 'all'); } });
+    if (activeOwner)            chips.push({ label: ownerDisplayName(activeOwner),                     reset: function () { activeOwner = ''; renderOwnerChip(); applyFilters(); } });
     if (activeTag)              chips.push({ label: '#' + activeTag,                                   reset: function () { clearTag(); } });
     if (qualityOnly)            chips.push({ label: 'Recommended', reset: function () { qualityChk.checked = false; qualityOnly = false; applyFilters(); } });
     if (activeOnly)             chips.push({ label: 'Active only', reset: function () { activeChk.checked = false; activeOnly = false; applyFilters(); } });
@@ -807,7 +809,7 @@ var REPO_NAME    = 'tubi-data-catalog';
     setFilter('domain', 'all');
     setFilter('pod', 'all');
     activeOwner = '';
-    buildOwnerFilter();
+    renderOwnerChip();
     clearTag();
     qualityChk.checked = true;  qualityOnly = true;
     activeChk.checked  = false; activeOnly  = false;
@@ -1111,86 +1113,63 @@ var REPO_NAME    = 'tubi-data-catalog';
     showToast('GitHub opened — fill in your details and click Submit.', 'info');
   });
 
-  // ── Owner filter (hierarchical: team → individual owner) ──────────
-  function buildOwnerFilter() {
-    var section = document.getElementById('owner-filter-section');
-    if (!section) return;
+  // ── Owner search filter ──────────────────────────────────────────────
+  function ownerDisplayName(lower) {
+    return lower.split(' ').map(function(w) { return w ? w[0].toUpperCase() + w.slice(1) : ''; }).join(' ');
+  }
 
-    // Build pod → owners map from card data
-    var podToOwners = {};
+  var ownerInput   = document.getElementById('owner-search-input');
+  var ownerResults = document.getElementById('owner-search-results');
+  var ownerChipEl  = document.getElementById('owner-active-chip');
+
+  function renderOwnerChip() {
+    if (!ownerChipEl) return;
+    if (!activeOwner) { ownerChipEl.style.display = 'none'; ownerChipEl.innerHTML = ''; return; }
+    ownerChipEl.style.display = '';
+    ownerChipEl.innerHTML = '<span class="owner-active-tag">' + ownerDisplayName(activeOwner)
+      + ' <button id="owner-chip-clear" aria-label="Clear owner filter">\u00d7</button></span>';
+    document.getElementById('owner-chip-clear').addEventListener('click', function() {
+      activeOwner = ''; renderOwnerChip(); applyFilters();
+    });
+  }
+
+  function showOwnerResults(q) {
+    var lower = q.toLowerCase();
+    var seen = {}, matches = [];
     cards.forEach(function(card) {
-      var pods = (card.dataset.pods || '').split(',').filter(Boolean);
-      if (!pods.length) pods = ['non-dsa'];
-      var owner = (card.dataset.owner || '').trim();
-      pods.forEach(function(pod) {
-        if (!podToOwners[pod]) podToOwners[pod] = [];
-        if (owner && podToOwners[pod].indexOf(owner) === -1) podToOwners[pod].push(owner);
-      });
+      var o = (card.dataset.owner || '').trim();
+      if (o && !seen[o] && o.indexOf(lower) !== -1) { seen[o] = true; matches.push(o); }
     });
-
-    function teamBlock(label, slug) {
-      var owners = (podToOwners[slug] || []).slice().sort();
-      var isActive = activePod === slug;
-      var html = '<div class="filter-item' + (isActive && !activeOwner ? ' active' : '') + '" data-filter="pod" data-value="' + slug + '">';
-      html += '<span class="dot"></span><span class="owner-team-label">' + label + '</span>';
-      if (owners.length) html += '<span class="owner-expand-btn" data-target="owners-' + slug + '">▶</span>';
-      html += '</div>';
-      if (owners.length) {
-        var expanded = isActive; // auto-expand active team
-        html += '<div class="owner-items" id="owners-' + slug + '" style="' + (expanded ? '' : 'display:none') + '">';
-        owners.forEach(function(owner) {
-          var display = owner.indexOf('@') !== -1 ? owner.split('@')[0] : owner;
-          html += '<div class="filter-item filter-item-owner' + (activeOwner === owner ? ' active' : '') + '" data-filter="owner" data-value="' + owner.replace(/"/g, '&quot;') + '">';
-          html += '<span class="dot"></span>' + display + '</div>';
-        });
-        html += '</div>';
-      }
-      return html;
-    }
-
-    var html = '<div class="filter-item' + (activePod === 'all' ? ' active' : '') + '" data-filter="pod" data-value="all"><span class="dot"></span> All Owners</div>';
-    DSA_PODS.forEach(function(name) { html += teamBlock(name, POD_SLUG[name]); });
-    html += teamBlock('Non-DSA', 'non-dsa');
-    section.innerHTML = html;
-
-    // Team row clicks
-    section.querySelectorAll('.filter-item[data-filter="pod"]').forEach(function(el) {
-      el.addEventListener('click', function() {
-        activeOwner = '';
-        setFilter('pod', el.dataset.value);
-        buildOwnerFilter(); // re-render to expand active team
-      });
-    });
-
-    // Expand arrow clicks (toggle only — does not change filter)
-    section.querySelectorAll('.owner-expand-btn').forEach(function(btn) {
-      btn.addEventListener('click', function(e) {
-        e.stopPropagation();
-        var target = document.getElementById(btn.dataset.target);
-        if (!target) return;
-        var open = target.style.display !== 'none';
-        target.style.display = open ? 'none' : '';
-        btn.textContent = open ? '▶' : '▼';
-      });
-    });
-
-    // Individual owner clicks
-    section.querySelectorAll('.filter-item-owner').forEach(function(el) {
+    matches.sort();
+    if (!matches.length) { ownerResults.style.display = 'none'; return; }
+    ownerResults.innerHTML = matches.map(function(o) {
+      return '<div class="owner-result-item" data-value="' + o.replace(/"/g, '&quot;') + '">'
+        + ownerDisplayName(o) + '</div>';
+    }).join('');
+    ownerResults.style.display = '';
+    ownerResults.querySelectorAll('.owner-result-item').forEach(function(el) {
       el.addEventListener('click', function() {
         activeOwner = el.dataset.value;
-        // Find which pod this owner belongs to and set it
-        var group = el.closest('.owner-items');
-        if (group) {
-          var podEl = group.previousElementSibling;
-          if (podEl && podEl.dataset.value) activePod = podEl.dataset.value;
-        }
-        buildOwnerFilter();
+        ownerInput.value = '';
+        ownerResults.style.display = 'none';
+        renderOwnerChip();
         applyFilters();
       });
     });
   }
 
-  buildOwnerFilter();
+  if (ownerInput) {
+    ownerInput.addEventListener('input', function() {
+      var q = this.value.trim();
+      if (!q) { ownerResults.style.display = 'none'; return; }
+      showOwnerResults(q);
+    });
+    ownerInput.addEventListener('blur', function() {
+      setTimeout(function() { ownerResults.style.display = 'none'; }, 150);
+    });
+  }
+
+  renderOwnerChip();
 
   // ── Pending-request badge ─────────────────────────────────────────
   function loadPendingCount() {
