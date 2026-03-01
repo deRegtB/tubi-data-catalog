@@ -212,5 +212,17 @@
     "name": "Sid Monthly KPIs",
     "updated_by": "Bryan deRegt",
     "updated_at": "2026-03-01T02:52:11.505Z"
+  },
+  "https://tubi-dev.cloud.databricks.com/sql/dashboardsv3/01f056f56358151cbbd030aae68dda00": {
+    "domains": [
+      "Finance & BizOps"
+    ],
+    "pods": [],
+    "featured": false,
+    "status": "active",
+    "note": "",
+    "name": "TVT and Revenue Curves",
+    "updated_by": "Bryan deRegt",
+    "updated_at": "2026-03-01T02:52:30.263Z"
   }
 }
