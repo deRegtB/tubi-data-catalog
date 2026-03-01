@@ -186,5 +186,19 @@
     "name": "Monthly KPI Dashboard",
     "updated_by": "Bryan deRegt",
     "updated_at": "2026-03-01T02:51:32.369Z"
+  },
+  "https://10ay.online.tableau.com/#/site/tubianalytics/workbooks/3390020": {
+    "domains": [
+      "Finance & BizOps"
+    ],
+    "pods": [
+      "finance-bizops"
+    ],
+    "featured": false,
+    "status": "active",
+    "note": "",
+    "name": "Official Accounting TVT Curve",
+    "updated_by": "Bryan deRegt",
+    "updated_at": "2026-03-01T02:51:47.953Z"
   }
 }
