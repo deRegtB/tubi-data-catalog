@@ -224,5 +224,17 @@
     "name": "TVT and Revenue Curves",
     "updated_by": "Bryan deRegt",
     "updated_at": "2026-03-01T02:52:30.263Z"
+  },
+  "https://10ay.online.tableau.com/#/site/tubianalytics/workbooks/2861307": {
+    "domains": [
+      "General Tubi"
+    ],
+    "pods": [],
+    "featured": true,
+    "status": "active",
+    "note": "",
+    "name": "Weekly KPI Dashboard (WBR)",
+    "updated_by": "Bryan deRegt",
+    "updated_at": "2026-03-01T02:52:47.606Z"
   }
 }
