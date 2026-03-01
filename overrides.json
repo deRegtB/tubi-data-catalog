@@ -94,5 +94,19 @@
     "name": "Cross Platform Active Users - Sanky",
     "updated_by": "Bryan deRegt",
     "updated_at": "2026-03-01T02:48:43.057Z"
+  },
+  "https://6d9b2980.us1a.app.preset.io/superset/dashboard/dau-rolling-us/": {
+    "domains": [
+      "Viewer Growth"
+    ],
+    "pods": [
+      "viewer-growth"
+    ],
+    "featured": false,
+    "status": "hidden",
+    "note": "",
+    "name": "DAU Trends - Rolling 7 & 28 Day (US)",
+    "updated_by": "Bryan deRegt",
+    "updated_at": "2026-03-01T02:48:58.329Z"
   }
 }
