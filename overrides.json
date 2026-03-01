@@ -174,5 +174,17 @@
     "name": "KPI Summarized View (WBR)",
     "updated_by": "Bryan deRegt",
     "updated_at": "2026-03-01T02:51:04.799Z"
+  },
+  "https://10ay.online.tableau.com/#/site/tubianalytics/workbooks/2857821": {
+    "domains": [
+      "General Tubi"
+    ],
+    "pods": [],
+    "featured": true,
+    "status": "active",
+    "note": "",
+    "name": "Monthly KPI Dashboard",
+    "updated_by": "Bryan deRegt",
+    "updated_at": "2026-03-01T02:51:32.369Z"
   }
 }
